@@ -1,13 +1,19 @@
 "use client";
 import { useEffect, useState } from "react";
-import { doc, onSnapshot, setDoc } from "firebase/firestore"; // setDoc toegevoegd
+import { doc, onSnapshot } from "firebase/firestore";
 import { db } from "../lib/firebase";
-import { Clock, Swords, Database } from "lucide-react";
+import { Clock, Swords, Ban } from "lucide-react"; // Ban icoon toegevoegd
 import { ScrollReveal } from "../components/ScrollReveal";
 
 export default function SchedulePage() {
   const [schedule, setSchedule] = useState<any[]>([]);
-  const [liveStatus, setLiveStatus] = useState({ status: "CLOSED", label: "Gesloten" });
+
+  // Standaard status is gesloten (Rood)
+  const [liveStatus, setLiveStatus] = useState({
+    status: "CLOSED",
+    label: "Gesloten",
+    color: "red", // red | orange | green
+  });
 
   useEffect(() => {
     const unsub = onSnapshot(doc(db, "content", "timetable"), (d) => {
@@ -15,38 +21,6 @@ export default function SchedulePage() {
     });
     return () => unsub();
   }, []);
-
-  // --- TIJDELIJKE FUNCTIE OM DATA TE VULLEN ---
-  const seedSchedule = async () => {
-    const days = ["Maandag", "Dinsdag", "Woensdag", "Donderdag", "Vrijdag"];
-
-    // Maak voor elke dag een object aan
-    const newSchedule = days.map((day) => ({
-      day: day,
-      slots: [
-        {
-          id: 1,
-          start: "10:00",
-          end: "18:00",
-          label: "Open Access",
-          type: "open", // 'open' zorgt voor standaard styling, 'team' voor rood
-        },
-      ],
-    }));
-
-    if (confirm("Weet je zeker dat je het schema wilt overschrijven met Ma-Vr 10u-18u?")) {
-      try {
-        await setDoc(doc(db, "content", "timetable"), {
-          schedule: newSchedule,
-        });
-        alert("Schema succesvol ingesteld!");
-      } catch (error) {
-        console.error(error);
-        alert("Fout bij opslaan (check je permissions?): " + error);
-      }
-    }
-  };
-  // ---------------------------------------------
 
   // Live status update elke minuut
   useEffect(() => {
@@ -57,8 +31,10 @@ export default function SchedulePage() {
       const currentMins = now.getHours() * 60 + now.getMinutes();
 
       const today = schedule.find((d: any) => d.day === currentDay);
+
+      // Als er vandaag geen schema is
       if (!today) {
-        setLiveStatus({ status: "CLOSED", label: "Gesloten" });
+        setLiveStatus({ status: "CLOSED", label: "Gesloten", color: "red" });
         return;
       }
 
@@ -68,20 +44,99 @@ export default function SchedulePage() {
         const [eH, eM] = slot.end.split(":").map(Number);
         const start = sH * 60 + sM;
         const end = eH * 60 + eM;
+
+        // Als we BINNEN een tijdslot zitten
         if (currentMins >= start && currentMins < end) {
           found = true;
-          setLiveStatus(slot.type === "open" ? { status: "OPEN", label: "Open Access" } : { status: "BEZET", label: `Bezet (${slot.label})` });
+
+          if (slot.type === "open") {
+            // Situatie 1: Open Access -> GROEN
+            setLiveStatus({
+              status: "OPEN",
+              label: "Geopend",
+              color: "green",
+            });
+          } else if (slot.type === "team") {
+            // Situatie 2: Team / Event -> ORANJE
+            setLiveStatus({
+              status: "TEAM",
+              label: `Gesloten voor publiek (${slot.label})`,
+              color: "orange",
+            });
+          } else {
+            // Situatie 3: Expliciet Gesloten -> ROOD
+            setLiveStatus({
+              status: "CLOSED",
+              label: `Gesloten (${slot.label})`,
+              color: "red",
+            });
+          }
           break;
         }
       }
-      if (!found) setLiveStatus({ status: "CLOSED", label: "Gesloten" });
+
+      // Situatie 4: Buiten openingsuren -> ROOD
+      if (!found) {
+        setLiveStatus({ status: "CLOSED", label: "Gesloten", color: "red" });
+      }
     };
 
-    if (schedule.length > 0) check(); // Check pas als er een schedule is
+    if (schedule.length > 0) check();
 
     const interval = setInterval(check, 60000);
     return () => clearInterval(interval);
   }, [schedule]);
+
+  // Helper functie om de classes te bepalen op basis van kleur state
+  const getStatusClasses = () => {
+    switch (liveStatus.color) {
+      case "green":
+        return "bg-green-500/10 border-green-500/50 text-green-400";
+      case "orange":
+        return "bg-orange-500/10 border-orange-500/50 text-orange-400";
+      case "red":
+      default:
+        return "bg-red-500/10 border-red-500/50 text-red-400";
+    }
+  };
+
+  const getDotColor = () => {
+    switch (liveStatus.color) {
+      case "green":
+        return "bg-green-500";
+      case "orange":
+        return "bg-orange-500";
+      default:
+        return "bg-red-500";
+    }
+  };
+
+  // Helper voor slot styling in de lijst
+  const getSlotStyle = (type: string) => {
+    switch (type) {
+      case "open":
+        return "bg-green-900/5 border-slate-800";
+      case "team":
+        return "bg-orange-900/10 border-orange-900/30";
+      case "closed":
+        return "bg-red-900/10 border-red-900/30";
+      default:
+        return "bg-slate-900 border-slate-800";
+    }
+  };
+
+  const getIconStyle = (type: string) => {
+    switch (type) {
+      case "open":
+        return "bg-green-600 text-white";
+      case "team":
+        return "bg-orange-600 text-white";
+      case "closed":
+        return "bg-red-600 text-white";
+      default:
+        return "bg-slate-800 text-gray-400";
+    }
+  };
 
   return (
     <div className="min-h-screen bg-slate-950 text-white py-24 px-4">
@@ -91,25 +146,15 @@ export default function SchedulePage() {
             <h1 className="text-5xl font-black mb-6">
               WEEK <span className="text-red-600">SCHEMA</span>
             </h1>
-            <div
-              className={`p-6 rounded-2xl border mb-8 ${
-                liveStatus.status === "OPEN"
-                  ? "bg-green-900/20 border-green-500/50"
-                  : liveStatus.status === "BEZET"
-                    ? "bg-orange-900/20 border-orange-500/50"
-                    : "bg-slate-900 border-slate-800"
-              }`}
-            >
+
+            {/* Live Status Box */}
+            <div className={`p-6 rounded-2xl border mb-8 transition-colors duration-500 ${getStatusClasses()}`}>
               <h4 className="font-bold mb-2 flex items-center gap-2">
-                <div
-                  className={`w-3 h-3 rounded-full animate-pulse ${
-                    liveStatus.status === "OPEN" ? "bg-green-500" : liveStatus.status === "BEZET" ? "bg-orange-500" : "bg-red-500"
-                  }`}
-                ></div>
+                <div className={`w-3 h-3 rounded-full animate-pulse ${getDotColor()}`}></div>
                 Live Status
               </h4>
-              <p className="text-gray-400">
-                De ruimte is: <span className="font-bold text-white">{liveStatus.label}</span>
+              <p className="opacity-90">
+                De ruimte is: <span className="font-bold block text-lg mt-1">{liveStatus.label}</span>
               </p>
             </div>
           </ScrollReveal>
@@ -120,29 +165,24 @@ export default function SchedulePage() {
 
           {schedule.map((day: any, idx: number) => (
             <ScrollReveal key={idx} direction="right" delay={idx * 50}>
-              <div className="flex flex-col md:flex-row bg-slate-950 border border-slate-800 rounded-xl overflow-hidden">
-                <div className="bg-slate-900 p-6 w-full md:w-40 flex items-center justify-center font-black text-xl uppercase tracking-wider">
-                  {day.day}
-                </div>
+              <div className={`flex flex-col md:flex-row bg-slate-950 border border-slate-800 rounded-xl overflow-hidden ${["Zaterdag", "Zondag"].includes(day.day) ? "opacity-75" : ""}`}>
+                <div className="bg-slate-900 p-6 w-full md:w-40 flex items-center justify-center font-black text-xl uppercase tracking-wider text-gray-300">{day.day}</div>
                 <div className="flex-1 p-4 grid gap-3">
-                  {day.slots.map((slot: any, sIdx: number) => (
-                    <div
-                      key={sIdx}
-                      className={`flex items-center gap-4 p-3 rounded-lg border ${
-                        slot.type === "team" ? "bg-red-900/10 border-red-900/30" : "bg-slate-900 border-slate-800"
-                      }`}
-                    >
-                      <div className={`p-2 rounded ${slot.type === "team" ? "bg-red-600 text-white" : "bg-slate-800 text-gray-400"}`}>
-                        {slot.type === "team" ? <Swords size={16} /> : <Clock size={16} />}
+                  {day.slots.length === 0 ? (
+                    <div className="text-gray-500 italic text-sm py-2">Gesloten</div>
+                  ) : (
+                    day.slots.map((slot: any, sIdx: number) => (
+                      <div key={sIdx} className={`flex items-center gap-4 p-3 rounded-lg border ${getSlotStyle(slot.type)}`}>
+                        <div className={`p-2 rounded ${getIconStyle(slot.type)}`}>{slot.type === "team" ? <Swords size={16} /> : slot.type === "closed" ? <Ban size={16} /> : <Clock size={16} />}</div>
+                        <div>
+                          <span className="block font-bold text-white">{slot.label}</span>
+                          <span className="text-xs text-gray-500 font-mono">
+                            {slot.start} - {slot.end}
+                          </span>
+                        </div>
                       </div>
-                      <div>
-                        <span className="block font-bold">{slot.label}</span>
-                        <span className="text-xs text-gray-500">
-                          {slot.start} - {slot.end}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
+                    ))
+                  )}
                 </div>
               </div>
             </ScrollReveal>
