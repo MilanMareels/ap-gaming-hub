@@ -19,7 +19,12 @@ export default function SchedulePage() {
     // Luister naar wijzigingen in het rooster
     const unsub = onSnapshot(doc(db, "content", "timetable"), (d) => {
       if (d.exists()) {
-        setSchedule(d.data().schedule || []);
+        const fullSchedule = d.data().schedule || [];
+
+        // --- AANPASSING: FILTER WEEKEND ERUIT ---
+        const workWeek = fullSchedule.filter((day: any) => day.day !== "Zaterdag" && day.day !== "Zondag");
+
+        setSchedule(workWeek);
       }
     });
     return () => unsub();
@@ -28,19 +33,20 @@ export default function SchedulePage() {
   // Live status update elke minuut
   useEffect(() => {
     const check = () => {
+      // Als er nog geen data is, doe niks
       if (schedule.length === 0) return;
 
       const now = new Date();
-      // BELANGRIJK: JS getDay() begint bij 0 = Zondag. Deze volgorde moet kloppen!
+      // BELANGRIJK: JS getDay() begint bij 0 = Zondag.
       const daysMap = ["Zondag", "Maandag", "Dinsdag", "Woensdag", "Donderdag", "Vrijdag", "Zaterdag"];
 
-      const currentDayName = daysMap[now.getDay()]; // Haal de naam van vandaag op (bv "Woensdag")
+      const currentDayName = daysMap[now.getDay()]; // Haal de naam van vandaag op
       const currentMins = now.getHours() * 60 + now.getMinutes();
 
-      // Zoek het schema van vandaag in de database data
+      // Zoek het schema van vandaag in de gefilterde schedule
       const todaySchedule = schedule.find((d: any) => d.day === currentDayName);
 
-      // Als er vandaag geen schema is gevonden -> Gesloten (Rood)
+      // Als er vandaag geen schema is gevonden (dus ook in het weekend), zet op GESLOTEN
       if (!todaySchedule) {
         setLiveStatus({ status: "CLOSED", label: "Gesloten", color: "red" });
         return;
@@ -100,7 +106,6 @@ export default function SchedulePage() {
 
   // --- STYLING HELPERS ---
 
-  // 1. De grote Live Status box bovenaan
   const getStatusClasses = () => {
     switch (liveStatus.color) {
       case "green":
@@ -124,15 +129,14 @@ export default function SchedulePage() {
     }
   };
 
-  // 2. De individuele kaartjes in de lijst
   const getSlotStyle = (type: string) => {
     switch (type) {
       case "open":
-        return "bg-green-900/10 border-green-900/30 text-green-200"; // Groen
+        return "bg-green-900/10 border-green-900/30 text-green-200";
       case "team":
-        return "bg-orange-900/10 border-orange-900/30 text-orange-200"; // Oranje
+        return "bg-orange-900/10 border-orange-900/30 text-orange-200";
       case "closed":
-        return "bg-red-900/10 border-red-900/30 text-red-400 opacity-60"; // Rood
+        return "bg-red-900/10 border-red-900/30 text-red-400 opacity-60";
       default:
         return "bg-slate-900 border-slate-800";
     }
@@ -176,13 +180,13 @@ export default function SchedulePage() {
           </ScrollReveal>
         </div>
 
-        {/* RECHTS: Het Rooster */}
+        {/* RECHTS: Het Rooster (Zonder Weekend) */}
         <div className="lg:w-2/3 space-y-4">
           {schedule.length === 0 && <div className="text-gray-500 italic">Rooster laden...</div>}
 
           {schedule.map((day: any, idx: number) => (
             <ScrollReveal key={idx} direction="right" delay={idx * 50}>
-              <div className={`flex flex-col md:flex-row bg-slate-950 border border-slate-800 rounded-xl overflow-hidden ${["Zaterdag", "Zondag"].includes(day.day) ? "border-slate-800/50" : ""}`}>
+              <div className="flex flex-col md:flex-row bg-slate-950 border border-slate-800 rounded-xl overflow-hidden">
                 {/* Dag Naam */}
                 <div className="bg-slate-900 p-6 w-full md:w-32 flex items-center justify-center font-black text-sm uppercase tracking-wider text-gray-400 border-b md:border-b-0 md:border-r border-slate-800">
                   {day.day.substring(0, 3)}
