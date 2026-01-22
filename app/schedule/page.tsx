@@ -156,7 +156,7 @@ export default function SchedulePage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-white py-24 px-4">
+    <div className="min-h-screen bg-slate-950 text-white py-24 px-4 flex items-center justify-center">
       <div className="container mx-auto max-w-6xl flex flex-col lg:flex-row gap-16">
         {/* LINKS: Titel & Live Status */}
         <div className="lg:w-1/3">
@@ -175,12 +175,10 @@ export default function SchedulePage() {
                 Momenteel: <span className="font-bold block text-2xl mt-1">{liveStatus.label}</span>
               </p>
             </div>
-
-            <p className="text-gray-400 text-sm leading-relaxed">Bekijk hieronder wanneer we open zijn voor casual gaming, en wanneer er teams aan het trainen zijn of events plaatsvinden.</p>
           </ScrollReveal>
         </div>
 
-        {/* RECHTS: Het Rooster (Zonder Weekend) */}
+        {/* RECHTS: Het Rooster */}
         <div className="lg:w-2/3 space-y-4">
           {schedule.length === 0 && <div className="text-gray-500 italic">Rooster laden...</div>}
 
@@ -190,7 +188,6 @@ export default function SchedulePage() {
                 {/* Dag Naam */}
                 <div className="bg-slate-900 p-6 w-full md:w-32 flex items-center justify-center font-black text-sm uppercase tracking-wider text-gray-400 border-b md:border-b-0 md:border-r border-slate-800">
                   {day.day.substring(0, 3)}
-                  <span className="md:hidden ml-1">{day.day.substring(3)}</span>
                 </div>
 
                 {/* Slots */}
