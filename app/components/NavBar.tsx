@@ -1,0 +1,79 @@
+"use client"; // Dit is essentieel voor interactie!
+
+import React, { useState } from "react";
+import Link from "next/link";
+import { Gamepad2, Lock, Menu, X } from "lucide-react";
+
+export default function Navbar() {
+  const [isOpen, setIsOpen] = useState(false);
+
+  // Lijst met links om de code netjes te houden
+  const navItems = ["Home", "Events", "Reservations", "Roster", "Schedule", "Highscores", "Info"];
+
+  return (
+    <nav className="w-full z-50 bg-slate-950/80 backdrop-blur-md border-b border-red-600/20 sticky top-0">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex items-center justify-between h-20">
+          {/* LOGO */}
+          <Link href="/" className="flex items-center group cursor-pointer" onClick={() => setIsOpen(false)}>
+            <div className="relative">
+              <div className="absolute inset-0 bg-red-500 blur-lg opacity-20 group-hover:opacity-40 transition-opacity"></div>
+              <Gamepad2 className="h-8 w-8 text-red-500 relative z-10" />
+            </div>
+            <span className="ml-3 text-2xl font-black italic tracking-tighter text-white">
+              AP<span className="text-red-500">GAMING</span>
+            </span>
+          </Link>
+
+          {/* DESKTOP MENU (Hidden on mobile) */}
+          <div className="hidden md:flex ml-10 items-baseline space-x-1">
+            {navItems.map((item) => (
+              <Link
+                key={item}
+                href={item === "Home" ? "/" : `/${item.toLowerCase()}`}
+                className="relative px-4 py-2 rounded-lg text-sm font-bold text-gray-300 hover:text-white hover:bg-white/5 transition-all group"
+              >
+                {item}
+                <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-red-500 transition-all group-hover:w-full"></span>
+              </Link>
+            ))}
+            {/* Admin Lock Desktop */}
+            <Link href="/admin" className="text-gray-500 hover:text-white p-2 ml-4">
+              <Lock size={20} />
+            </Link>
+          </div>
+
+          {/* MOBILE HAMBURGER BUTTON */}
+          <div className="md:hidden flex items-center">
+            <button onClick={() => setIsOpen(!isOpen)} className="text-gray-300 hover:text-white focus:outline-none p-2">
+              {isOpen ? <X size={28} /> : <Menu size={28} />}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* MOBILE MENU DROPDOWN */}
+      {isOpen && (
+        <div className="md:hidden bg-slate-950 border-b border-red-600/20 absolute w-full left-0 top-20 shadow-2xl">
+          <div className="px-4 pt-2 pb-6 space-y-2">
+            {navItems.map((item) => (
+              <Link
+                key={item}
+                href={item === "Home" ? "/" : `/${item.toLowerCase()}`}
+                onClick={() => setIsOpen(false)} // Sluit menu na klik
+                className="block px-3 py-3 rounded-md text-base font-bold text-gray-300 hover:text-white hover:bg-red-600/10 hover:border-l-4 hover:border-red-500 transition-all"
+              >
+                {item}
+              </Link>
+            ))}
+            <Link href="/admin" onClick={() => setIsOpen(false)} className="block px-3 py-3 rounded-md text-base font-bold text-gray-500 hover:text-white">
+              <div className="flex items-center gap-2">
+                <Lock size={16} /> Admin
+              </div>
+            </Link>
+          </div>
+        </div>
+      )}
+    </nav>
+  );
+}
