@@ -38,15 +38,13 @@ interface DaySchedule {
   slots: { start: string; end: string; label: string; type: "open" | "team" | "closed" }[];
 }
 
-// Standaard weekstructuur (Maandag startend, volledige week)
+// Standaard weekstructuur
 const DEFAULT_WEEK = [
   { day: "Maandag", slots: [] },
   { day: "Dinsdag", slots: [] },
   { day: "Woensdag", slots: [] },
   { day: "Donderdag", slots: [] },
   { day: "Vrijdag", slots: [] },
-  { day: "Zaterdag", slots: [] },
-  { day: "Zondag", slots: [] },
 ];
 
 // --- LOGIN COMPONENT ---
@@ -102,7 +100,7 @@ const LoginScreen = ({ onLoginSuccess }: { onLoginSuccess: (u: User) => void }) 
 // --- MAIN ADMIN PAGE ---
 export default function AdminPage() {
   const [user, setUser] = useState<User | null>(null);
-  const [activeTab, setActiveTab] = useState("timetable"); // Start op timetable
+  const [activeTab, setActiveTab] = useState("timetable");
   const [loading, setLoading] = useState(true);
 
   // Data States
@@ -110,15 +108,14 @@ export default function AdminPage() {
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [highscores, setHighscores] = useState<Highscore[]>([]);
   const [rosters, setRosters] = useState<RosterData>({});
-
-  // Timetable state
   const [timetable, setTimetable] = useState<DaySchedule[]>(DEFAULT_WEEK);
 
   const [settings, setSettings] = useState({ googleFormUrl: "" });
   const [lists, setLists] = useState({ rosterGames: [], highscoreGames: [], eventTypes: [] });
 
   // Inputs
-  const [newEvent, setNewEvent] = useState({ title: "", date: "", time: "", type: "Casual" });
+  // UPDATE: endTime toegevoegd aan state
+  const [newEvent, setNewEvent] = useState({ title: "", date: "", time: "", endTime: "", type: "Casual" });
   const [newPlayer, setNewPlayer] = useState({ name: "", handle: "", role: "", rank: "" });
   const [rosterGame, setRosterGame] = useState("");
   const [newListItems, setNewListItems] = useState({ roster: "", highscore: "", event: "" });
@@ -135,23 +132,14 @@ export default function AdminPage() {
   useEffect(() => {
     if (!user) return;
 
-    // 1. Events
     const unsubEv = onSnapshot(query(collection(db, "events"), orderBy("date")), (s) => setEvents(s.docs.map((d) => ({ id: d.id, ...d.data() }) as EventItem)));
-
-    // 2. Reservations
     const unsubRes = onSnapshot(query(collection(db, "reservations"), orderBy("date", "desc")), (s) => setReservations(s.docs.map((d) => ({ id: d.id, ...d.data() }) as Reservation)));
-
-    // 3. Highscores
     const unsubHigh = onSnapshot(query(collection(db, "highscores"), orderBy("score", "desc")), (s) => setHighscores(s.docs.map((d) => ({ id: d.id, ...d.data() }) as Highscore)));
-
-    // 4. Rosters
     const unsubRosters = onSnapshot(doc(db, "content", "rosters"), (d) => d.exists() && setRosters(d.data().data));
 
-    // 5. Timetable (Met merge logica en sortering)
     const unsubTime = onSnapshot(doc(db, "content", "timetable"), (d) => {
       if (d.exists() && d.data().schedule) {
         const dbSchedule = d.data().schedule;
-        // Zorg dat de volgorde altijd Ma-Zo is
         const sortedSchedule = DEFAULT_WEEK.map((defDay) => {
           const found = dbSchedule.find((s: DaySchedule) => s.day === defDay.day);
           return found || defDay;
@@ -162,7 +150,6 @@ export default function AdminPage() {
       }
     });
 
-    // 6. Settings
     const unsubSet = onSnapshot(doc(db, "content", "settings"), (d) => {
       if (d.exists()) {
         setSettings(d.data().settings || { googleFormUrl: "" });
@@ -182,10 +169,52 @@ export default function AdminPage() {
   }, [user]);
 
   // --- Handlers ---
+
+  // UPDATE: Nieuwe logica om Event ook in Timetable te zetten
   const handleAddEvent = async () => {
-    if (newEvent.title) {
-      await addDoc(collection(db, "events"), newEvent);
-      setNewEvent({ title: "", date: "", time: "", type: "Casual" });
+    // Validatie: check ook endTime
+    if (newEvent.title && newEvent.date && newEvent.time && newEvent.endTime) {
+      try {
+        // 1. Opslaan in Events Collectie (Lijstweergave)
+        await addDoc(collection(db, "events"), {
+          title: newEvent.title,
+          date: newEvent.date,
+          time: `${newEvent.time} - ${newEvent.endTime}`, // Display string
+          type: newEvent.type,
+        });
+
+        // 2. Automatisch toevoegen aan Weekplanning (Timetable)
+        const daysMap = ["Zondag", "Maandag", "Dinsdag", "Woensdag", "Donderdag", "Vrijdag", "Zaterdag"];
+        const dateObj = new Date(newEvent.date);
+        const dayName = daysMap[dateObj.getDay()]; // Bv "Vrijdag"
+
+        // Update de lokale en DB state van het rooster
+        const updatedTimetable = [...timetable];
+        const dayIndex = updatedTimetable.findIndex((d) => d.day === dayName);
+
+        if (dayIndex !== -1) {
+          updatedTimetable[dayIndex].slots.push({
+            start: newEvent.time,
+            end: newEvent.endTime,
+            label: `EVENT: ${newEvent.title}`, // Label voor in rooster
+            type: "team", // 'team' = Oranje kleur (niet publiek/open)
+          });
+
+          // Sorteer slots op tijd
+          updatedTimetable[dayIndex].slots.sort((a, b) => a.start.localeCompare(b.start));
+
+          setTimetable(updatedTimetable);
+          await setDoc(doc(db, "content", "timetable"), { schedule: updatedTimetable });
+        }
+
+        setNewEvent({ title: "", date: "", time: "", endTime: "", type: "Casual" });
+        alert("Event toegevoegd aan lijst én weekplanning!");
+      } catch (error) {
+        console.error("Error:", error);
+        alert("Fout bij opslaan.");
+      }
+    } else {
+      alert("Vul aub alle velden in (Titel, Datum, Start- & Eindtijd).");
     }
   };
 
@@ -316,11 +345,11 @@ export default function AdminPage() {
           </div>
         )}
 
-        {/* ==================== EVENTS ==================== */}
+        {/* ==================== EVENTS (UPDATED) ==================== */}
         {activeTab === "events" && (
           <div className="grid lg:grid-cols-3 gap-8">
             <div className="bg-slate-900 p-6 rounded-xl border border-slate-800 h-fit">
-              <h3 className="font-bold mb-4">Event Toevoegen</h3>
+              <h3 className="font-bold mb-4">Event Toevoegen & Inplannen</h3>
               <div className="space-y-3">
                 <input
                   className="w-full bg-slate-950 border border-slate-700 p-3 rounded text-white"
@@ -328,20 +357,37 @@ export default function AdminPage() {
                   value={newEvent.title}
                   onChange={(e) => setNewEvent({ ...newEvent, title: e.target.value })}
                 />
+
+                {/* Datum */}
+                <input
+                  type="date"
+                  className="w-full bg-slate-950 border border-slate-700 p-3 rounded text-white"
+                  value={newEvent.date}
+                  onChange={(e) => setNewEvent({ ...newEvent, date: e.target.value })}
+                />
+
+                {/* Tijdsloten (Van - Tot) - UPDATE */}
                 <div className="grid grid-cols-2 gap-2">
-                  <input
-                    type="date"
-                    className="bg-slate-950 border border-slate-700 p-3 rounded text-white"
-                    value={newEvent.date}
-                    onChange={(e) => setNewEvent({ ...newEvent, date: e.target.value })}
-                  />
-                  <input
-                    type="time"
-                    className="bg-slate-950 border border-slate-700 p-3 rounded text-white"
-                    value={newEvent.time}
-                    onChange={(e) => setNewEvent({ ...newEvent, time: e.target.value })}
-                  />
+                  <div>
+                    <label className="text-[10px] uppercase text-gray-500 font-bold">Starttijd</label>
+                    <input
+                      type="time"
+                      className="w-full bg-slate-950 border border-slate-700 p-3 rounded text-white"
+                      value={newEvent.time}
+                      onChange={(e) => setNewEvent({ ...newEvent, time: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] uppercase text-gray-500 font-bold">Eindtijd</label>
+                    <input
+                      type="time"
+                      className="w-full bg-slate-950 border border-slate-700 p-3 rounded text-white"
+                      value={newEvent.endTime}
+                      onChange={(e) => setNewEvent({ ...newEvent, endTime: e.target.value })}
+                    />
+                  </div>
                 </div>
+
                 <select className="w-full bg-slate-950 border border-slate-700 p-3 rounded text-white" value={newEvent.type} onChange={(e) => setNewEvent({ ...newEvent, type: e.target.value })}>
                   {lists.eventTypes.map((t) => (
                     <option key={t} value={t}>
@@ -350,17 +396,18 @@ export default function AdminPage() {
                   ))}
                 </select>
                 <button onClick={handleAddEvent} className="w-full bg-green-600 font-bold py-3 rounded hover:bg-green-500">
-                  Toevoegen
+                  Opslaan in Agenda
                 </button>
               </div>
             </div>
+
             <div className="lg:col-span-2 space-y-2">
               {events.map((ev) => (
                 <div key={ev.id} className="flex justify-between items-center bg-slate-900 p-4 rounded border border-slate-800">
                   <div>
                     <div className="font-bold">{ev.title}</div>
                     <div className="text-xs text-gray-400">
-                      {ev.date} @ {ev.time} ({ev.type})
+                      {ev.date} | {ev.time} ({ev.type})
                     </div>
                   </div>
                   <button onClick={() => deleteDoc(doc(db, "events", ev.id))} className="text-red-500">
@@ -477,11 +524,10 @@ export default function AdminPage() {
         {/* ==================== TIMETABLE ==================== */}
         {activeTab === "timetable" && (
           <div className="bg-slate-900 p-6 rounded-xl border border-slate-800">
-            {/* Header met Save knop */}
             <div className="flex justify-between items-center mb-8 sticky top-0 z-10 bg-slate-900 py-2 border-b border-slate-800">
               <div>
                 <h3 className="font-bold text-2xl text-white">Weekplanning</h3>
-                <p className="text-gray-400 text-sm">Beheer hier de openingsuren (Ma-Zo).</p>
+                <p className="text-gray-400 text-sm">Beheer hier de openingsuren (Ma-Vr).</p>
               </div>
               <button onClick={saveTimetable} className="bg-green-600 hover:bg-green-500 text-white px-6 py-3 rounded-xl font-bold flex gap-2 shadow-lg shadow-green-900/20 transition-all">
                 <Save size={20} /> Opslaan
@@ -491,7 +537,6 @@ export default function AdminPage() {
             <div className="space-y-6">
               {timetable.map((day, dIdx) => (
                 <div key={dIdx} className={`border rounded-xl overflow-hidden bg-slate-950/50 ${["Zaterdag", "Zondag"].includes(day.day) ? "border-slate-800 opacity-60" : "border-slate-700"}`}>
-                  {/* Dag Header */}
                   <div className="bg-slate-900 px-6 py-4 flex justify-between items-center border-b border-slate-800">
                     <span className="font-black text-lg text-gray-200 uppercase tracking-wide flex items-center gap-2">
                       {day.day}
@@ -500,7 +545,6 @@ export default function AdminPage() {
                     <button
                       onClick={() => {
                         const t = [...timetable];
-                        // Default leeg tijdslot
                         t[dIdx].slots.push({ start: "09:00", end: "17:00", label: "Open Access", type: "open" });
                         setTimetable(t);
                       }}
@@ -510,14 +554,12 @@ export default function AdminPage() {
                     </button>
                   </div>
 
-                  {/* Slots Lijst */}
                   <div className="p-4 space-y-3">
                     {day.slots.length === 0 ? (
                       <div className="text-center text-gray-600 italic py-2 text-sm">Gesloten</div>
                     ) : (
                       day.slots.map((slot, sIdx) => (
                         <div key={sIdx} className="flex flex-col md:flex-row gap-4 items-center bg-slate-900 p-4 rounded-lg border border-slate-800 shadow-sm">
-                          {/* Tijden - Type="time" forceert 24u op NL/BE systemen */}
                           <div className="flex items-center gap-3">
                             <Clock size={16} className="text-gray-500" />
                             <div className="flex flex-col">
@@ -549,7 +591,6 @@ export default function AdminPage() {
                             </div>
                           </div>
 
-                          {/* Label Input */}
                           <div className="flex-1 w-full">
                             <span className="text-[10px] uppercase text-gray-500 font-bold block mb-1">Activiteit</span>
                             <input
@@ -565,7 +606,6 @@ export default function AdminPage() {
                             />
                           </div>
 
-                          {/* Type Selectie (MET KLEUREN LOGICA) */}
                           <div className="w-full md:w-auto flex items-end gap-2">
                             <div className="w-full">
                               <span className="text-[10px] uppercase text-gray-500 font-bold block mb-1">Status</span>
