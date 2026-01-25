@@ -24,20 +24,20 @@ export default function EventsPage() {
       <div className="container mx-auto max-w-4xl">
         <ScrollReveal direction="up">
           <h1 className="text-5xl font-black text-center mb-12">
-            UPCOMING <span className="text-red-600">EVENTS</span>
+            AANKOMENDE <span className="text-red-600">EVENEMENTEN</span>
           </h1>
         </ScrollReveal>
 
         <div className="grid gap-6">
           {events.length === 0 ? (
-            <div className="text-center text-gray-500 py-12 border border-dashed border-slate-800 rounded-xl">Geen events gepland.</div>
+            <div className="text-center text-gray-500 py-12 border border-dashed border-slate-800 rounded-xl">Geen evenementen gepland.</div>
           ) : (
             events.map((event, index) => {
               const [day, month] = formatDate(event.date);
               return (
                 <ScrollReveal key={event.id} direction="up" delay={index * 100}>
                   <div className="flex flex-col md:flex-row items-center bg-slate-900 p-6 rounded-2xl border border-slate-800 hover:border-red-500/50 transition-all">
-                    <div className="bg-slate-950 p-4 rounded-xl text-center min-w-[90px] border border-slate-800 mb-4 md:mb-0 md:mr-8">
+                    <div className="bg-slate-950 p-4 rounded-xl text-center min-w-22.5 border border-slate-800 mb-4 md:mb-0 md:mr-8">
                       <span className="block text-red-500 font-black text-2xl">{day}</span>
                       <span className="block text-xs text-gray-400 font-bold uppercase">{month}</span>
                     </div>

@@ -74,20 +74,8 @@ const LoginScreen = ({ onLoginSuccess }: { onLoginSuccess: (u: User) => void }) 
         <h2 className="text-3xl font-black mb-8 text-center text-white">Admin Toegang</h2>
         {error && <div className="text-red-400 text-center mb-4 text-sm">{error}</div>}
         <form onSubmit={handleSubmit} className="space-y-4">
-          <input
-            type="email"
-            placeholder="admin@ap.be"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="w-full bg-slate-950 border border-slate-700 p-4 rounded-xl outline-none text-white"
-          />
-          <input
-            type="password"
-            placeholder="•••••••"
-            value={pass}
-            onChange={(e) => setPass(e.target.value)}
-            className="w-full bg-slate-950 border border-slate-700 p-4 rounded-xl outline-none text-white"
-          />
+          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full bg-slate-950 border border-slate-700 p-4 rounded-xl outline-none text-white" />
+          <input type="password" value={pass} onChange={(e) => setPass(e.target.value)} className="w-full bg-slate-950 border border-slate-700 p-4 rounded-xl outline-none text-white" />
           <button type="submit" disabled={loading} className="w-full bg-red-600 hover:bg-red-500 text-white py-4 rounded-xl font-bold">
             {loading ? <Loader2 className="animate-spin mx-auto" /> : "Aanmelden"}
           </button>
@@ -173,7 +161,7 @@ export default function AdminPage() {
   // UPDATE: Nieuwe logica om Event ook in Timetable te zetten
   const handleAddEvent = async () => {
     // Validatie: check ook endTime
-    if (newEvent.title && newEvent.date && newEvent.time && newEvent.endTime) {
+    if (newEvent.title && newEvent.date && newEvent.time && newEvent.endTime && newEvent.type) {
       try {
         // 1. Opslaan in Events Collectie (Lijstweergave)
         await addDoc(collection(db, "events"), {
@@ -214,7 +202,7 @@ export default function AdminPage() {
         alert("Fout bij opslaan.");
       }
     } else {
-      alert("Vul aub alle velden in (Titel, Datum, Start- & Eindtijd).");
+      alert("Vul aub alle velden in (Titel, Datum, Start- & Eindtijd, Type).");
     }
   };
 
@@ -345,13 +333,14 @@ export default function AdminPage() {
           </div>
         )}
 
-        {/* ==================== EVENTS (UPDATED) ==================== */}
+        {/* ==================== EVENTS ==================== */}
         {activeTab === "events" && (
           <div className="grid lg:grid-cols-3 gap-8">
             <div className="bg-slate-900 p-6 rounded-xl border border-slate-800 h-fit">
               <h3 className="font-bold mb-4">Event Toevoegen & Inplannen</h3>
               <div className="space-y-3">
                 <input
+                  required
                   className="w-full bg-slate-950 border border-slate-700 p-3 rounded text-white"
                   placeholder="Titel"
                   value={newEvent.title}
@@ -360,8 +349,9 @@ export default function AdminPage() {
 
                 {/* Datum */}
                 <input
+                  required
                   type="date"
-                  className="w-full bg-slate-950 border border-slate-700 p-3 rounded text-white"
+                  className="w-full bg-slate-950 border border-slate-700 p-3 rounded text-white [&::-webkit-calendar-picker-indicator]:invert"
                   value={newEvent.date}
                   onChange={(e) => setNewEvent({ ...newEvent, date: e.target.value })}
                 />
@@ -371,8 +361,9 @@ export default function AdminPage() {
                   <div>
                     <label className="text-[10px] uppercase text-gray-500 font-bold">Starttijd</label>
                     <input
+                      required
                       type="time"
-                      className="w-full bg-slate-950 border border-slate-700 p-3 rounded text-white"
+                      className="w-full bg-slate-950 border border-slate-700 p-3 rounded text-white [&::-webkit-calendar-picker-indicator]:invert"
                       value={newEvent.time}
                       onChange={(e) => setNewEvent({ ...newEvent, time: e.target.value })}
                     />
@@ -380,8 +371,9 @@ export default function AdminPage() {
                   <div>
                     <label className="text-[10px] uppercase text-gray-500 font-bold">Eindtijd</label>
                     <input
+                      required
                       type="time"
-                      className="w-full bg-slate-950 border border-slate-700 p-3 rounded text-white"
+                      className="w-full bg-slate-950 border border-slate-700 p-3 rounded text-white [&::-webkit-calendar-picker-indicator]:invert"
                       value={newEvent.endTime}
                       onChange={(e) => setNewEvent({ ...newEvent, endTime: e.target.value })}
                     />
@@ -474,12 +466,14 @@ export default function AdminPage() {
                 <input
                   className="w-full bg-slate-950 border border-slate-700 p-3 rounded text-white"
                   placeholder="Naam"
+                  required
                   value={newPlayer.name}
                   onChange={(e) => setNewPlayer({ ...newPlayer, name: e.target.value })}
                 />
                 <input
                   className="w-full bg-slate-950 border border-slate-700 p-3 rounded text-white"
                   placeholder="Gamer Tag"
+                  required
                   value={newPlayer.handle}
                   onChange={(e) => setNewPlayer({ ...newPlayer, handle: e.target.value })}
                 />
@@ -487,12 +481,14 @@ export default function AdminPage() {
                   <input
                     className="bg-slate-950 border border-slate-700 p-3 rounded text-white"
                     placeholder="Rol"
+                    required
                     value={newPlayer.role}
                     onChange={(e) => setNewPlayer({ ...newPlayer, role: e.target.value })}
                   />
                   <input
                     className="bg-slate-950 border border-slate-700 p-3 rounded text-white"
                     placeholder="Rank"
+                    required
                     value={newPlayer.rank}
                     onChange={(e) => setNewPlayer({ ...newPlayer, rank: e.target.value })}
                   />
@@ -538,14 +534,11 @@ export default function AdminPage() {
               {timetable.map((day, dIdx) => (
                 <div key={dIdx} className={`border rounded-xl overflow-hidden bg-slate-950/50 ${["Zaterdag", "Zondag"].includes(day.day) ? "border-slate-800 opacity-60" : "border-slate-700"}`}>
                   <div className="bg-slate-900 px-6 py-4 flex justify-between items-center border-b border-slate-800">
-                    <span className="font-black text-lg text-gray-200 uppercase tracking-wide flex items-center gap-2">
-                      {day.day}
-                      {["Zaterdag", "Zondag"].includes(day.day) && <span className="text-xs bg-slate-800 text-gray-500 px-2 py-0.5 rounded normal-case font-normal">Weekend</span>}
-                    </span>
+                    <span className="font-black text-lg text-gray-200 uppercase tracking-wide flex items-center gap-2">{day.day}</span>
                     <button
                       onClick={() => {
                         const t = [...timetable];
-                        t[dIdx].slots.push({ start: "09:00", end: "17:00", label: "Open Access", type: "open" });
+                        t[dIdx].slots.push({ start: "09:00", end: "18:00", label: "Open toegang", type: "open" });
                         setTimetable(t);
                       }}
                       className="text-xs bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded-lg font-bold flex items-center gap-1 transition-colors"
@@ -566,7 +559,7 @@ export default function AdminPage() {
                               <span className="text-[10px] uppercase text-gray-500 font-bold">Van</span>
                               <input
                                 type="time"
-                                className="bg-slate-950 border border-slate-700 rounded p-2 text-white text-sm outline-none focus:border-blue-500 font-mono"
+                                className="bg-slate-950 border border-slate-700 rounded p-2 text-white text-sm outline-none focus:border-blue-500 font-mono [&::-webkit-calendar-picker-indicator]:invert"
                                 value={slot.start}
                                 onChange={(e) => {
                                   const t = [...timetable];
@@ -580,7 +573,7 @@ export default function AdminPage() {
                               <span className="text-[10px] uppercase text-gray-500 font-bold">Tot</span>
                               <input
                                 type="time"
-                                className="bg-slate-950 border border-slate-700 rounded p-2 text-white text-sm outline-none focus:border-blue-500 font-mono"
+                                className="bg-slate-950 border border-slate-700 rounded p-2 text-white text-sm outline-none focus:border-blue-500 font-mono [&::-webkit-calendar-picker-indicator]:invert"
                                 value={slot.end}
                                 onChange={(e) => {
                                   const t = [...timetable];
@@ -632,7 +625,7 @@ export default function AdminPage() {
                                 t[dIdx].slots.splice(sIdx, 1);
                                 setTimetable(t);
                               }}
-                              className="bg-red-900/20 text-red-500 hover:bg-red-900/40 p-2.5 rounded transition-colors mb-[1px]"
+                              className="bg-red-900/20 text-red-500 hover:bg-red-900/40 p-2.5 rounded transition-colors mb-px"
                               title="Verwijder"
                             >
                               <Trash2 size={16} />

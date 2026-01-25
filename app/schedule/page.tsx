@@ -16,12 +16,10 @@ export default function SchedulePage() {
   });
 
   useEffect(() => {
-    // Luister naar wijzigingen in het rooster
     const unsub = onSnapshot(doc(db, "content", "timetable"), (d) => {
       if (d.exists()) {
         const fullSchedule = d.data().schedule || [];
 
-        // --- AANPASSING: FILTER WEEKEND ERUIT ---
         const workWeek = fullSchedule.filter((day: any) => day.day !== "Zaterdag" && day.day !== "Zondag");
 
         setSchedule(workWeek);
@@ -162,7 +160,7 @@ export default function SchedulePage() {
         <div className="lg:w-1/3">
           <ScrollReveal direction="left">
             <h1 className="text-5xl font-black mb-6">
-              WEEK <span className="text-red-600">SCHEMA</span>
+              OPENINGS <span className="text-red-600">UREN</span>
             </h1>
 
             {/* Live Status Box */}
