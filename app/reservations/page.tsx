@@ -3,11 +3,14 @@ import React, { useState } from "react";
 import { addDoc, collection } from "firebase/firestore";
 import { db } from "../lib/firebase"; // Import je firebase config
 import { Calendar, Clock, Monitor, Gamepad2, CheckCircle, AlertTriangle } from "lucide-react";
+import WorkInProgress from "../components/WorkInProgress";
 
 export default function ReservationPage() {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState("");
+
+  const work: boolean = true;
 
   const [formData, setFormData] = useState({
     sNumber: "",
@@ -94,6 +97,10 @@ export default function ReservationPage() {
     );
   }
 
+  if (work) {
+    return <WorkInProgress />;
+  }
+
   return (
     <div className="min-h-screen bg-slate-950 py-24 px-4 text-white">
       <div className="max-w-2xl mx-auto">
@@ -143,9 +150,7 @@ export default function ReservationPage() {
                 type="button"
                 onClick={() => setFormData({ ...formData, inventory: "PC" })}
                 className={`p-4 rounded-xl border flex flex-col items-center gap-2 transition-all ${
-                  formData.inventory === "PC"
-                    ? "bg-red-600 border-red-500 text-white"
-                    : "bg-slate-950 border-slate-800 text-gray-400 hover:border-gray-600"
+                  formData.inventory === "PC" ? "bg-red-600 border-red-500 text-white" : "bg-slate-950 border-slate-800 text-gray-400 hover:border-gray-600"
                 }`}
               >
                 <Monitor size={32} />
@@ -155,9 +160,7 @@ export default function ReservationPage() {
                 type="button"
                 onClick={() => setFormData({ ...formData, inventory: "PS5" })}
                 className={`p-4 rounded-xl border flex flex-col items-center gap-2 transition-all ${
-                  formData.inventory === "PS5"
-                    ? "bg-blue-600 border-blue-500 text-white"
-                    : "bg-slate-950 border-slate-800 text-gray-400 hover:border-gray-600"
+                  formData.inventory === "PS5" ? "bg-blue-600 border-blue-500 text-white" : "bg-slate-950 border-slate-800 text-gray-400 hover:border-gray-600"
                 }`}
               >
                 <Gamepad2 size={32} />
@@ -225,11 +228,7 @@ export default function ReservationPage() {
             </label>
           </div>
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-white text-slate-950 font-black py-4 rounded-xl hover:bg-gray-200 transition-colors disabled:opacity-50"
-          >
+          <button type="submit" disabled={loading} className="w-full bg-white text-slate-950 font-black py-4 rounded-xl hover:bg-gray-200 transition-colors disabled:opacity-50">
             {loading ? "Bezig met boeken..." : "RESERVEER NU"}
           </button>
         </form>

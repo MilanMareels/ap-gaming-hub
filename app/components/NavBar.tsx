@@ -11,7 +11,7 @@ export default function Navbar() {
   const navItems = ["Home", "Events", "Reservations", "Roster", "Schedule", "Highscores", "Info"];
 
   return (
-    <nav className="w-full z-50 bg-slate-950/80 backdrop-blur-md border-b border-red-600/20 sticky top-0">
+    <nav className="w-full bg-slate-950/80 backdrop-blur-md border-b border-red-600/20">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-20">
           {/* LOGO */}
@@ -26,7 +26,7 @@ export default function Navbar() {
           </Link>
 
           {/* DESKTOP MENU (Hidden on mobile) */}
-          <div className="hidden md:flex ml-10 items-baseline space-x-1">
+          <div className="hidden md:flex ml-10 items-center space-x-1">
             {navItems.map((item) => (
               <Link
                 key={item}
