@@ -5,38 +5,7 @@ import { signInWithEmailAndPassword, onAuthStateChanged, signOut, User } from "f
 import { collection, addDoc, deleteDoc, doc, updateDoc, onSnapshot, query, orderBy, setDoc } from "firebase/firestore";
 import { auth, db } from "../lib/firebase";
 import { LogOut, Loader2, Plus, Trash2, Save, Check, Ban, X, Clock } from "lucide-react";
-
-// --- TYPES ---
-interface EventItem {
-  id: string;
-  title: string;
-  date: string;
-  time: string;
-  type: string;
-}
-interface Highscore {
-  id: string;
-  game: string;
-  player: string;
-  score: number;
-  status: string;
-}
-interface Reservation {
-  id: string;
-  sNumber: string;
-  email: string;
-  inventory: string;
-  date: string;
-  startTime: string;
-  endTime: string;
-}
-interface RosterData {
-  [game: string]: { name: string; handle: string; role: string; rank: string }[];
-}
-interface DaySchedule {
-  day: string;
-  slots: { start: string; end: string; label: string; type: "open" | "team" | "closed" }[];
-}
+import { EventItem, Reservation, Highscore, RosterData, DaySchedule } from "../lib/types";
 
 // Standaard weekstructuur
 const DEFAULT_WEEK = [
@@ -47,7 +16,6 @@ const DEFAULT_WEEK = [
   { day: "Vrijdag", slots: [] },
 ];
 
-// --- LOGIN COMPONENT ---
 const LoginScreen = ({ onLoginSuccess }: { onLoginSuccess: (u: User) => void }) => {
   const [email, setEmail] = useState("");
   const [pass, setPass] = useState("");
@@ -85,7 +53,6 @@ const LoginScreen = ({ onLoginSuccess }: { onLoginSuccess: (u: User) => void }) 
   );
 };
 
-// --- MAIN ADMIN PAGE ---
 export default function AdminPage() {
   const [user, setUser] = useState<User | null>(null);
   const [activeTab, setActiveTab] = useState("timetable");
@@ -98,11 +65,10 @@ export default function AdminPage() {
   const [rosters, setRosters] = useState<RosterData>({});
   const [timetable, setTimetable] = useState<DaySchedule[]>(DEFAULT_WEEK);
 
+  // Inputs
   const [settings, setSettings] = useState({ googleFormUrl: "" });
   const [lists, setLists] = useState({ rosterGames: [], highscoreGames: [], eventTypes: [] });
 
-  // Inputs
-  // UPDATE: endTime toegevoegd aan state
   const [newEvent, setNewEvent] = useState({ title: "", date: "", time: "", endTime: "", type: "Casual" });
   const [newPlayer, setNewPlayer] = useState({ name: "", handle: "", role: "", rank: "" });
   const [rosterGame, setRosterGame] = useState("");
@@ -156,27 +122,21 @@ export default function AdminPage() {
     };
   }, [user]);
 
-  // --- Handlers ---
-
-  // UPDATE: Nieuwe logica om Event ook in Timetable te zetten
+  // Handlers
   const handleAddEvent = async () => {
-    // Validatie: check ook endTime
     if (newEvent.title && newEvent.date && newEvent.time && newEvent.endTime && newEvent.type) {
       try {
-        // 1. Opslaan in Events Collectie (Lijstweergave)
         await addDoc(collection(db, "events"), {
           title: newEvent.title,
           date: newEvent.date,
-          time: `${newEvent.time} - ${newEvent.endTime}`, // Display string
+          time: `${newEvent.time} - ${newEvent.endTime}`,
           type: newEvent.type,
         });
 
-        // 2. Automatisch toevoegen aan Weekplanning (Timetable)
         const daysMap = ["Zondag", "Maandag", "Dinsdag", "Woensdag", "Donderdag", "Vrijdag", "Zaterdag"];
         const dateObj = new Date(newEvent.date);
-        const dayName = daysMap[dateObj.getDay()]; // Bv "Vrijdag"
+        const dayName = daysMap[dateObj.getDay()];
 
-        // Update de lokale en DB state van het rooster
         const updatedTimetable = [...timetable];
         const dayIndex = updatedTimetable.findIndex((d) => d.day === dayName);
 
@@ -184,11 +144,10 @@ export default function AdminPage() {
           updatedTimetable[dayIndex].slots.push({
             start: newEvent.time,
             end: newEvent.endTime,
-            label: `EVENT: ${newEvent.title}`, // Label voor in rooster
-            type: "team", // 'team' = Oranje kleur (niet publiek/open)
+            label: `EVENT: ${newEvent.title}`,
+            type: "team",
           });
 
-          // Sorteer slots op tijd
           updatedTimetable[dayIndex].slots.sort((a, b) => a.start.localeCompare(b.start));
 
           setTimetable(updatedTimetable);
@@ -233,7 +192,6 @@ export default function AdminPage() {
     }
   };
 
-  // --- List Helpers ---
   const addListItem = (type: "rosterGames" | "highscoreGames" | "eventTypes", val: string) => {
     if (!val) return;
     setLists({ ...lists, [type]: [...lists[type], val] });
@@ -287,7 +245,7 @@ export default function AdminPage() {
           ))}
         </div>
 
-        {/* ==================== RESERVATIONS ==================== */}
+        {/* RESERVATIONS */}
         {activeTab === "reservations" && (
           <div className="bg-slate-900 rounded-xl border border-slate-800 overflow-hidden">
             <table className="w-full text-left text-sm">
@@ -333,7 +291,7 @@ export default function AdminPage() {
           </div>
         )}
 
-        {/* ==================== EVENTS ==================== */}
+        {/* EVENTS */}
         {activeTab === "events" && (
           <div className="grid lg:grid-cols-3 gap-8">
             <div className="bg-slate-900 p-6 rounded-xl border border-slate-800 h-fit">
@@ -411,7 +369,7 @@ export default function AdminPage() {
           </div>
         )}
 
-        {/* ==================== SCORES ==================== */}
+        {/* SCORES */}
         {activeTab === "scores" && (
           <div className="bg-slate-900 rounded-xl border border-slate-800 overflow-hidden">
             <table className="w-full text-left text-sm">
@@ -450,7 +408,7 @@ export default function AdminPage() {
           </div>
         )}
 
-        {/* ==================== ROSTERS ==================== */}
+        {/* ROSTERS */}
         {activeTab === "rosters" && (
           <div className="grid lg:grid-cols-3 gap-8">
             <div className="bg-slate-900 p-6 rounded-xl border border-slate-800 h-fit">
@@ -517,7 +475,7 @@ export default function AdminPage() {
           </div>
         )}
 
-        {/* ==================== TIMETABLE ==================== */}
+        {/* TIMETABLE */}
         {activeTab === "timetable" && (
           <div className="bg-slate-900 p-6 rounded-xl border border-slate-800">
             <div className="flex justify-between items-center mb-8 sticky top-0 z-10 bg-slate-900 py-2 border-b border-slate-800">
@@ -647,7 +605,7 @@ export default function AdminPage() {
           </div>
         )}
 
-        {/* ==================== SETTINGS ==================== */}
+        {/* SETTINGS */}
         {activeTab === "settings" && (
           <div className="grid md:grid-cols-2 gap-8">
             <div className="bg-slate-900 p-6 rounded-xl border border-slate-800">

@@ -12,7 +12,7 @@ export default function SchedulePage() {
   const [liveStatus, setLiveStatus] = useState({
     status: "CLOSED",
     label: "Gesloten",
-    color: "red", // red | orange | green
+    color: "red", // red | orange | groen
   });
 
   useEffect(() => {
@@ -31,11 +31,9 @@ export default function SchedulePage() {
   // Live status update elke minuut
   useEffect(() => {
     const check = () => {
-      // Als er nog geen data is, doe niks
       if (schedule.length === 0) return;
 
       const now = new Date();
-      // BELANGRIJK: JS getDay() begint bij 0 = Zondag.
       const daysMap = ["Zondag", "Maandag", "Dinsdag", "Woensdag", "Donderdag", "Vrijdag", "Zaterdag"];
 
       const currentDayName = daysMap[now.getDay()]; // Haal de naam van vandaag op
@@ -52,7 +50,6 @@ export default function SchedulePage() {
 
       let foundActiveSlot = false;
 
-      // Loop door de tijdsloten van vandaag
       for (const slot of todaySchedule.slots) {
         if (!slot.start || !slot.end) continue;
 
@@ -61,43 +58,38 @@ export default function SchedulePage() {
         const start = sH * 60 + sM;
         const end = eH * 60 + eM;
 
-        // Check of de huidige tijd BINNEN dit slot valt
         if (currentMins >= start && currentMins < end) {
           foundActiveSlot = true;
 
           if (slot.type === "open") {
-            // OPEN ACCESS -> GROEN
             setLiveStatus({
               status: "OPEN",
               label: slot.label || "Geopend",
               color: "green",
             });
           } else if (slot.type === "team") {
-            // EVENTS / TEAM TRAINING -> ORANJE
             setLiveStatus({
               status: "TEAM",
               label: slot.label || "Bezet / Event",
               color: "orange",
             });
           } else {
-            // GESLOTEN -> ROOD
             setLiveStatus({
               status: "CLOSED",
               label: slot.label || "Gesloten",
               color: "red",
             });
           }
-          break; // Stop met zoeken, we hebben het huidige slot gevonden
+          break;
         }
       }
 
-      // Als we geen actief slot hebben gevonden (buiten openingsuren) -> ROOD
       if (!foundActiveSlot) {
         setLiveStatus({ status: "CLOSED", label: "Gesloten", color: "red" });
       }
     };
 
-    check(); // Direct uitvoeren bij laden
+    check();
     const interval = setInterval(check, 60000); // Elke minuut updaten
     return () => clearInterval(interval);
   }, [schedule]);
@@ -156,14 +148,12 @@ export default function SchedulePage() {
   return (
     <div className="min-h-screen bg-slate-950 text-white py-24 px-4 flex items-center justify-center">
       <div className="container mx-auto max-w-6xl flex flex-col lg:flex-row gap-16">
-        {/* LINKS: Titel & Live Status */}
         <div className="lg:w-1/3">
           <ScrollReveal direction="left">
             <h1 className="text-5xl font-black mb-6">
               OPENINGS <span className="text-red-600">UREN</span>
             </h1>
 
-            {/* Live Status Box */}
             <div className={`p-6 rounded-2xl border mb-8 transition-colors duration-500 ${getStatusClasses()}`}>
               <h4 className="font-bold mb-2 flex items-center gap-2">
                 <div className={`w-3 h-3 rounded-full animate-pulse ${getDotColor()}`}></div>
@@ -176,29 +166,24 @@ export default function SchedulePage() {
           </ScrollReveal>
         </div>
 
-        {/* RECHTS: Het Rooster */}
         <div className="lg:w-2/3 space-y-4">
           {schedule.length === 0 && <div className="text-gray-500 italic">Rooster laden...</div>}
 
           {schedule.map((day: any, idx: number) => (
             <ScrollReveal key={idx} direction="right" delay={idx * 50}>
               <div className="flex flex-col md:flex-row bg-slate-950 border border-slate-800 rounded-xl overflow-hidden">
-                {/* Dag Naam */}
                 <div className="bg-slate-900 p-6 w-full md:w-32 flex items-center justify-center font-black text-sm uppercase tracking-wider text-gray-400 border-b md:border-b-0 md:border-r border-slate-800">
                   {day.day.substring(0, 3)}
                 </div>
 
-                {/* Slots */}
                 <div className="flex-1 p-4 grid gap-3">
                   {day.slots && day.slots.length > 0 ? (
                     day.slots.map((slot: any, sIdx: number) => (
                       <div key={sIdx} className={`flex items-center gap-4 p-3 rounded-lg border ${getSlotStyle(slot.type)}`}>
-                        {/* Icoon */}
                         <div className={`p-2 rounded-md shadow-sm ${getIconStyle(slot.type)}`}>
                           {slot.type === "team" ? <Swords size={18} /> : slot.type === "closed" ? <Ban size={18} /> : <Clock size={18} />}
                         </div>
 
-                        {/* Tekst */}
                         <div>
                           <span className="block font-bold text-sm md:text-base">{slot.label}</span>
                           <span className="text-xs opacity-70 font-mono block mt-0.5">

@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { doc, onSnapshot } from "firebase/firestore";
 import { db } from "../lib/firebase";
-import { User, Shield } from "lucide-react";
+import { User } from "lucide-react";
 import { ScrollReveal } from "../components/ScrollReveal";
 
 export default function RosterPage() {
@@ -11,14 +11,12 @@ export default function RosterPage() {
   const [activeGame, setActiveGame] = useState("");
 
   useEffect(() => {
-    // Haal settings op voor de game tabs
     const unsubSettings = onSnapshot(doc(db, "content", "settings"), (d) => {
       if (d.exists() && d.data().lists?.rosterGames) {
         setGames(d.data().lists.rosterGames);
         if (!activeGame) setActiveGame(d.data().lists.rosterGames[0]);
       }
     });
-    // Haal spelers op
     const unsubRosters = onSnapshot(doc(db, "content", "rosters"), (d) => {
       if (d.exists()) setRosters(d.data().data);
     });
@@ -54,7 +52,6 @@ export default function RosterPage() {
           ))}
         </div>
 
-        {/* Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 max-w-6xl mx-auto">
           {(rosters[activeGame] || []).length === 0 ? (
             <div className="col-span-full text-center text-gray-500 italic">Geen spelers in dit team.</div>

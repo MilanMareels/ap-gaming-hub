@@ -1,4 +1,4 @@
-"use client"; // Dit is essentieel voor interactie!
+"use client";
 
 import React, { useState } from "react";
 import Link from "next/link";
@@ -7,7 +7,7 @@ import { Gamepad2, Lock, Menu, X } from "lucide-react";
 export default function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
 
-  // Lijst met links om de code netjes te houden
+  // Lijst met links
   const navItems = ["Home", "Events", "Reservations", "Roster", "Schedule", "Highscores", "Info"];
 
   return (
@@ -25,7 +25,6 @@ export default function Navbar() {
             </span>
           </Link>
 
-          {/* DESKTOP MENU (Hidden on mobile) */}
           <div className="hidden md:flex ml-10 items-center space-x-1">
             {navItems.map((item) => (
               <Link
@@ -37,13 +36,11 @@ export default function Navbar() {
                 <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-red-500 transition-all group-hover:w-full"></span>
               </Link>
             ))}
-            {/* Admin Lock Desktop */}
             <Link href="/admin" className="text-gray-500 hover:text-white p-2 ml-4">
               <Lock size={20} />
             </Link>
           </div>
 
-          {/* MOBILE HAMBURGER BUTTON */}
           <div className="md:hidden flex items-center">
             <button onClick={() => setIsOpen(!isOpen)} className="text-gray-300 hover:text-white focus:outline-none p-2">
               {isOpen ? <X size={28} /> : <Menu size={28} />}
@@ -52,7 +49,6 @@ export default function Navbar() {
         </div>
       </div>
 
-      {/* MOBILE MENU DROPDOWN */}
       {isOpen && (
         <div className="md:hidden bg-slate-950 border-b border-red-600/20 absolute w-full left-0 top-20 shadow-2xl">
           <div className="px-4 pt-2 pb-6 space-y-2">

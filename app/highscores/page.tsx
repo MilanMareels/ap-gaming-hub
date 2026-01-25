@@ -9,7 +9,6 @@ export default function HighscoresPage() {
   const [highscores, setHighscores] = useState<any[]>([]);
   const [gamesList, setGamesList] = useState<string[]>([]);
 
-  // State voor actieve game tab
   const [selectedGame, setSelectedGame] = useState<string>("");
 
   const [form, setForm] = useState({ player: "", score: "", game: "" });
@@ -21,7 +20,6 @@ export default function HighscoresPage() {
     const q = query(collection(db, "highscores"), orderBy("score", "desc"));
     const unsubScores = onSnapshot(q, (snap) => setHighscores(snap.docs.map((d) => ({ id: d.id, ...d.data() }))));
 
-    // 2. Games lijst ophalen en eerste game selecteren
     const unsubSettings = onDocSnapshot(doc(db, "content", "settings"), (d) => {
       if (d.exists() && d.data().lists?.highscoreGames) {
         const games = d.data().lists.highscoreGames;
@@ -40,7 +38,6 @@ export default function HighscoresPage() {
     };
   }, []);
 
-  // Update zowel de view (tab) als de data voor het formulier
   const handleGameChange = (game: string) => {
     setSelectedGame(game);
     setForm((prev) => ({ ...prev, game: game }));
@@ -50,7 +47,6 @@ export default function HighscoresPage() {
     e.preventDefault();
     setLoading(true);
 
-    // We gebruiken hier form.game, die dankzij handleGameChange altijd correct staat
     await addDoc(collection(db, "highscores"), {
       player: form.player,
       score: parseInt(form.score),
@@ -69,7 +65,7 @@ export default function HighscoresPage() {
 
   return (
     <div className="min-h-screen bg-slate-950 text-white py-24 px-4 relative overflow-hidden">
-      <div className="absolute inset-0 z-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-900 via-slate-950 to-slate-950"></div>
+      <div className="absolute inset-0 z-0 bg-[radial-gradient(ellipse_at_top,var(--tw-gradient-stops))] from-slate-900 via-slate-950 to-slate-950"></div>
 
       <div className="container mx-auto max-w-4xl relative z-10">
         <ScrollReveal direction="up">
@@ -82,7 +78,6 @@ export default function HighscoresPage() {
           </div>
         </ScrollReveal>
 
-        {/* --- GAME TABS --- */}
         <ScrollReveal direction="up" delay={100}>
           <div className="flex flex-wrap justify-center gap-4 mb-8">
             {gamesList.map((game) => (
@@ -105,7 +100,6 @@ export default function HighscoresPage() {
           </div>
         </ScrollReveal>
 
-        {/* --- TABEL --- */}
         <ScrollReveal direction="up" delay={200}>
           <div className="bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden mb-16 shadow-2xl">
             <div className="bg-slate-950/50 p-4 border-b border-slate-800 flex justify-between items-center">
@@ -153,9 +147,7 @@ export default function HighscoresPage() {
           </div>
         </ScrollReveal>
 
-        {/* --- FORMULIER --- */}
         <div className="max-w-md mx-auto bg-slate-900 p-8 rounded-2xl border border-slate-800">
-          {/* De titel maakt duidelijk voor welke game je indient */}
           <h3 className="text-2xl font-bold mb-6 text-center">
             Nieuwe Score voor <span className="text-yellow-500">{selectedGame}</span>?
           </h3>
@@ -171,7 +163,6 @@ export default function HighscoresPage() {
               onChange={(e) => setForm({ ...form, player: e.target.value })}
               className="w-full bg-slate-950 border border-slate-700 p-4 rounded-xl outline-none focus:border-yellow-500 transition-colors"
             />
-            {/* Game selectie veld is hier verwijderd */}
             <input
               required
               type="number"
