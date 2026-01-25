@@ -1,16 +1,24 @@
 "use client";
 import { useEffect, useState } from "react";
-import { collection, query, orderBy, onSnapshot } from "firebase/firestore";
+import { doc, onSnapshot } from "firebase/firestore";
 import { db } from "../lib/firebase";
-import { Clock, Gamepad2, CalendarDays } from "lucide-react";
+import { Clock, Gamepad2 } from "lucide-react";
 import { ScrollReveal } from "../components/ScrollReveal";
 
 export default function EventsPage() {
   const [events, setEvents] = useState<any[]>([]);
 
   useEffect(() => {
-    const q = query(collection(db, "events"), orderBy("date"));
-    return onSnapshot(q, (snap) => setEvents(snap.docs.map((d) => ({ id: d.id, ...d.data() }))));
+    const unsub = onSnapshot(doc(db, "content", "events"), (d) => {
+      if (d.exists()) {
+        const eventsList = d.data().events || [];
+        eventsList.sort((a: any, b: any) => a.date.localeCompare(b.date));
+        setEvents(eventsList);
+      } else {
+        setEvents([]);
+      }
+    });
+    return () => unsub();
   }, []);
 
   const formatDate = (dateStr: string) => {

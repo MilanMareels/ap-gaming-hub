@@ -1,6 +1,6 @@
 "use client";
 import React, { useState } from "react";
-import { addDoc, collection } from "firebase/firestore";
+import { doc, setDoc, arrayUnion } from "firebase/firestore";
 import { db } from "../lib/firebase"; // Import je firebase config
 import { Calendar, Clock, Monitor, Gamepad2, CheckCircle, AlertTriangle } from "lucide-react";
 import WorkInProgress from "../components/WorkInProgress";
@@ -68,11 +68,20 @@ export default function ReservationPage() {
       }
 
       // 5. Submit naar Firebase
-      await addDoc(collection(db, "reservations"), {
+      const newReservation = {
+        id: Date.now().toString(), // Unieke ID genereren
         ...formData,
         status: "active", // of 'pending'
         createdAt: new Date().toISOString(),
-      });
+      };
+
+      await setDoc(
+        doc(db, "content", "reservations"),
+        {
+          reservations: arrayUnion(newReservation),
+        },
+        { merge: true },
+      );
 
       setSuccess(true);
     } catch (err: any) {

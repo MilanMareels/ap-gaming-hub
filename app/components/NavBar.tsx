@@ -11,10 +11,9 @@ export default function Navbar() {
   const navItems = ["Home", "Events", "Reservations", "Roster", "Schedule", "Highscores", "Info"];
 
   return (
-    <nav className="w-full bg-slate-950/80 backdrop-blur-md border-b border-red-600/20">
+    <nav className="w-full bg-slate-950 border-b border-red-600/20 relative z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-20">
-          {/* LOGO */}
           <Link href="/" className="flex items-center group cursor-pointer" onClick={() => setIsOpen(false)}>
             <div className="relative">
               <div className="absolute inset-0 bg-red-500 blur-lg opacity-20 group-hover:opacity-40 transition-opacity"></div>
@@ -50,13 +49,13 @@ export default function Navbar() {
       </div>
 
       {isOpen && (
-        <div className="md:hidden bg-slate-950 border-b border-red-600/20 absolute w-full left-0 top-20 shadow-2xl">
+        <div className="md:hidden bg-slate-950 border-b border-red-600/20 absolute left-0 top-20 w-full h-[calc(100vh-5rem)] overflow-y-auto shadow-2xl">
           <div className="px-4 pt-2 pb-6 space-y-2">
             {navItems.map((item) => (
               <Link
                 key={item}
                 href={item === "Home" ? "/" : `/${item.toLowerCase()}`}
-                onClick={() => setIsOpen(false)} // Sluit menu na klik
+                onClick={() => setIsOpen(false)}
                 className="block px-3 py-3 rounded-md text-base font-bold text-gray-300 hover:text-white hover:bg-red-600/10 hover:border-l-4 hover:border-red-500 transition-all"
               >
                 {item}

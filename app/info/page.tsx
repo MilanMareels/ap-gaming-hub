@@ -54,7 +54,7 @@ export default function InfoPage() {
               <MessageCircle size={64} className="text-white mb-4" />
               <h2 className="text-3xl font-bold mb-2">Join Discord</h2>
               <p className="text-white/80 mb-6">Chat met andere studenten, vind teammates en blijf op de hoogte.</p>
-              <a href="https://discord.gg/JOUW_LINK" target="_blank" className="bg-white text-[#5865F2] px-8 py-3 rounded-full font-bold">
+              <a href="https://discord.gg/FGCC9GTetC" target="_blank" className="bg-white text-[#5865F2] px-8 py-3 rounded-full font-bold">
                 Join Server
               </a>
             </div>
@@ -74,13 +74,15 @@ export default function InfoPage() {
             </div>
           </div>
 
-          {/* FAQ Accordion */}
           <div className="max-w-7xl mx-auto">
             <h2 className="text-3xl font-bold mb-8 text-center">Veelgestelde Vragen</h2>
             <div className="space-y-4">
               {faqs.map((faq, index) => (
                 <div key={index} className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden transition-all hover:border-slate-700">
-                  <button onClick={() => setOpenIndex(openIndex === index ? null : index)} className="w-full flex items-center justify-between p-6 text-left font-bold focus:outline-none">
+                  <button
+                    onClick={() => setOpenIndex(openIndex === index ? null : index)}
+                    className="w-full flex items-center justify-between p-6 text-left font-bold focus:outline-none cursor-pointer"
+                  >
                     {faq.question}
                     {openIndex === index ? <ChevronUp className="text-red-500" /> : <ChevronDown className="text-gray-500" />}
                   </button>

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { signInWithEmailAndPassword, onAuthStateChanged, signOut, User } from "firebase/auth";
-import { collection, addDoc, deleteDoc, doc, updateDoc, onSnapshot, query, orderBy, setDoc } from "firebase/firestore";
+import { doc, updateDoc, onSnapshot, setDoc, arrayUnion, arrayRemove } from "firebase/firestore";
 import { auth, db } from "../lib/firebase";
 import { LogOut, Loader2, Plus, Trash2, Save, Check, Ban, X, Clock } from "lucide-react";
 import { EventItem, Reservation, Highscore, RosterData, DaySchedule } from "../lib/types";
@@ -86,9 +86,29 @@ export default function AdminPage() {
   useEffect(() => {
     if (!user) return;
 
-    const unsubEv = onSnapshot(query(collection(db, "events"), orderBy("date")), (s) => setEvents(s.docs.map((d) => ({ id: d.id, ...d.data() }) as EventItem)));
-    const unsubRes = onSnapshot(query(collection(db, "reservations"), orderBy("date", "desc")), (s) => setReservations(s.docs.map((d) => ({ id: d.id, ...d.data() }) as Reservation)));
-    const unsubHigh = onSnapshot(query(collection(db, "highscores"), orderBy("score", "desc")), (s) => setHighscores(s.docs.map((d) => ({ id: d.id, ...d.data() }) as Highscore)));
+    const unsubEv = onSnapshot(doc(db, "content", "events"), (d) => {
+      if (d.exists()) {
+        const list = d.data().events || [];
+        list.sort((a: any, b: any) => a.date.localeCompare(b.date));
+        setEvents(list);
+      }
+    });
+
+    const unsubRes = onSnapshot(doc(db, "content", "reservations"), (d) => {
+      if (d.exists()) {
+        const list = d.data().reservations || [];
+        list.sort((a: any, b: any) => b.date.localeCompare(a.date)); // Nieuwste eerst
+        setReservations(list);
+      }
+    });
+
+    const unsubHigh = onSnapshot(doc(db, "content", "highscores"), (d) => {
+      if (d.exists()) {
+        const list = d.data().highscores || [];
+        list.sort((a: any, b: any) => b.score - a.score);
+        setHighscores(list);
+      }
+    });
     const unsubRosters = onSnapshot(doc(db, "content", "rosters"), (d) => d.exists() && setRosters(d.data().data));
 
     const unsubTime = onSnapshot(doc(db, "content", "timetable"), (d) => {
@@ -126,12 +146,22 @@ export default function AdminPage() {
   const handleAddEvent = async () => {
     if (newEvent.title && newEvent.date && newEvent.time && newEvent.endTime && newEvent.type) {
       try {
-        await addDoc(collection(db, "events"), {
+        const newId = Date.now().toString();
+        const eventData = {
+          id: newId,
           title: newEvent.title,
           date: newEvent.date,
           time: `${newEvent.time} - ${newEvent.endTime}`,
           type: newEvent.type,
-        });
+        };
+
+        await setDoc(
+          doc(db, "content", "events"),
+          {
+            events: arrayUnion(eventData),
+          },
+          { merge: true },
+        );
 
         const daysMap = ["Zondag", "Maandag", "Dinsdag", "Woensdag", "Donderdag", "Vrijdag", "Zaterdag"];
         const dateObj = new Date(newEvent.date);
@@ -165,6 +195,34 @@ export default function AdminPage() {
     }
   };
 
+  const handleDeleteEvent = async (eventItem: EventItem) => {
+    if (confirm("Event verwijderen?")) {
+      await updateDoc(doc(db, "content", "events"), {
+        events: arrayRemove(eventItem),
+      });
+
+      const daysMap = ["Zondag", "Maandag", "Dinsdag", "Woensdag", "Donderdag", "Vrijdag", "Zaterdag"];
+      const dateObj = new Date(eventItem.date);
+      const dayName = daysMap[dateObj.getDay()];
+      const [startTime, endTime] = eventItem.time.split(" - ");
+
+      let changed = false;
+      const updatedTimetable = timetable.map((day) => {
+        if (day.day === dayName) {
+          const newSlots = day.slots.filter((slot) => !(slot.label === `EVENT: ${eventItem.title}` && slot.start === startTime && slot.end === endTime));
+          if (newSlots.length !== day.slots.length) changed = true;
+          return { ...day, slots: newSlots };
+        }
+        return day;
+      });
+
+      if (changed) {
+        setTimetable(updatedTimetable);
+        await setDoc(doc(db, "content", "timetable"), { schedule: updatedTimetable });
+      }
+    }
+  };
+
   const handleAddPlayer = async () => {
     if (newPlayer.handle && rosterGame) {
       const list = rosters[rosterGame] || [];
@@ -176,6 +234,27 @@ export default function AdminPage() {
   const handleDeletePlayer = async (idx: number) => {
     const list = rosters[rosterGame].filter((_, i) => i !== idx);
     await setDoc(doc(db, "content", "rosters"), { data: { ...rosters, [rosterGame]: list } });
+  };
+
+  const handleDeleteReservation = async (resItem: Reservation) => {
+    if (confirm("Reservatie verwijderen?")) {
+      await updateDoc(doc(db, "content", "reservations"), {
+        reservations: arrayRemove(resItem),
+      });
+    }
+  };
+
+  const handleApproveScore = async (score: Highscore) => {
+    const newList = highscores.map((s) => (s.id === score.id ? { ...s, status: "approved" } : s));
+    await setDoc(doc(db, "content", "highscores"), { highscores: newList }, { merge: true });
+  };
+
+  const handleDeleteScore = async (score: Highscore) => {
+    if (confirm("Score verwijderen?")) {
+      await updateDoc(doc(db, "content", "highscores"), {
+        highscores: arrayRemove(score),
+      });
+    }
   };
 
   const updateSettings = async () => {
@@ -273,7 +352,7 @@ export default function AdminPage() {
                       <span className={`px-2 py-1 rounded text-xs font-bold ${r.inventory === "PC" ? "bg-red-900/30 text-red-400" : "bg-blue-900/30 text-blue-400"}`}>{r.inventory}</span>
                     </td>
                     <td className="p-4 text-right">
-                      <button onClick={() => confirm("Verwijderen?") && deleteDoc(doc(db, "reservations", r.id))} className="text-red-500 hover:bg-red-900/20 p-2 rounded">
+                      <button onClick={() => handleDeleteReservation(r)} className="text-red-500 hover:bg-red-900/20 p-2 rounded">
                         <Trash2 size={16} />
                       </button>
                     </td>
@@ -360,7 +439,7 @@ export default function AdminPage() {
                       {ev.date} | {ev.time} ({ev.type})
                     </div>
                   </div>
-                  <button onClick={() => deleteDoc(doc(db, "events", ev.id))} className="text-red-500">
+                  <button onClick={() => handleDeleteEvent(ev)} className="text-red-500">
                     <Trash2 size={18} />
                   </button>
                 </div>
@@ -390,10 +469,10 @@ export default function AdminPage() {
                     <td className="p-4 text-right">
                       {s.status === "pending" ? (
                         <div className="flex justify-end gap-2">
-                          <button onClick={() => updateDoc(doc(db, "highscores", s.id), { status: "approved" })} className="text-green-500 bg-green-900/20 p-2 rounded">
+                          <button onClick={() => handleApproveScore(s)} className="text-green-500 bg-green-900/20 p-2 rounded">
                             <Check size={16} />
                           </button>
-                          <button onClick={() => deleteDoc(doc(db, "highscores", s.id))} className="text-red-500 bg-red-900/20 p-2 rounded">
+                          <button onClick={() => handleDeleteScore(s)} className="text-red-500 bg-red-900/20 p-2 rounded">
                             <Ban size={16} />
                           </button>
                         </div>

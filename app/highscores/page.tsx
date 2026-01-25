@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { collection, query, orderBy, onSnapshot, addDoc, doc, onSnapshot as onDocSnapshot } from "firebase/firestore";
+import { doc, onSnapshot, setDoc, arrayUnion } from "firebase/firestore";
 import { db } from "../lib/firebase";
 import { Medal, Loader2, Trophy, Gamepad2 } from "lucide-react";
 import { ScrollReveal } from "../components/ScrollReveal";
@@ -16,11 +16,15 @@ export default function HighscoresPage() {
   const [msg, setMsg] = useState("");
 
   useEffect(() => {
-    // 1. Highscores ophalen
-    const q = query(collection(db, "highscores"), orderBy("score", "desc"));
-    const unsubScores = onSnapshot(q, (snap) => setHighscores(snap.docs.map((d) => ({ id: d.id, ...d.data() }))));
+    const unsubScores = onSnapshot(doc(db, "content", "highscores"), (d) => {
+      if (d.exists()) {
+        const list = d.data().highscores || [];
+        list.sort((a: any, b: any) => b.score - a.score);
+        setHighscores(list);
+      }
+    });
 
-    const unsubSettings = onDocSnapshot(doc(db, "content", "settings"), (d) => {
+    const unsubSettings = onSnapshot(doc(db, "content", "settings"), (d) => {
       if (d.exists() && d.data().lists?.highscoreGames) {
         const games = d.data().lists.highscoreGames;
         setGamesList(games);
@@ -47,13 +51,22 @@ export default function HighscoresPage() {
     e.preventDefault();
     setLoading(true);
 
-    await addDoc(collection(db, "highscores"), {
+    const newScore = {
+      id: Date.now().toString(),
       player: form.player,
       score: parseInt(form.score),
       game: form.game,
       status: "pending",
       timestamp: new Date().toISOString(),
-    });
+    };
+
+    await setDoc(
+      doc(db, "content", "highscores"),
+      {
+        highscores: arrayUnion(newScore),
+      },
+      { merge: true },
+    );
 
     setLoading(false);
     setMsg("Score ingediend! Wacht op goedkeuring.");
