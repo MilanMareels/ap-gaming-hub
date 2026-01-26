@@ -68,6 +68,8 @@ export default function AdminPage() {
   // Inputs
   const [settings, setSettings] = useState({ googleFormUrl: "" });
   const [lists, setLists] = useState({ rosterGames: [], highscoreGames: [], eventTypes: [] });
+  const [inventory, setInventory] = useState<Record<string, number>>({ pc: 5, ps5: 1, switch: 1, controller: 8 });
+  const [newInventoryItem, setNewInventoryItem] = useState({ name: "", count: 0 });
 
   const [newEvent, setNewEvent] = useState({ title: "", date: "", time: "", endTime: "", type: "Casual" });
   const [newPlayer, setNewPlayer] = useState({ name: "", handle: "", role: "", rank: "" });
@@ -128,6 +130,7 @@ export default function AdminPage() {
       if (d.exists()) {
         setSettings(d.data().settings || { googleFormUrl: "" });
         setLists(d.data().lists || { rosterGames: [], highscoreGames: [], eventTypes: [] });
+        setInventory(d.data().inventory || { pc: 5, ps5: 1, switch: 1, controller: 8 });
         if (d.data().lists?.rosterGames?.length > 0 && !rosterGame) setRosterGame(d.data().lists.rosterGames[0]);
       }
     });
@@ -258,8 +261,24 @@ export default function AdminPage() {
   };
 
   const updateSettings = async () => {
-    await setDoc(doc(db, "content", "settings"), { settings, lists }, { merge: true });
+    await setDoc(doc(db, "content", "settings"), { settings, lists, inventory }, { merge: true });
     alert("Instellingen opgeslagen!");
+  };
+
+  const handleAddInventoryItem = () => {
+    if (newInventoryItem.name && newInventoryItem.count >= 0) {
+      setInventory({ ...inventory, [newInventoryItem.name]: newInventoryItem.count });
+      setNewInventoryItem({ name: "", count: 0 });
+    }
+  };
+
+  const handleRemoveInventoryItem = async (key: string) => {
+    if (confirm(`Wil je ${key} verwijderen uit de inventory?`)) {
+      const newInv = { ...inventory };
+      delete newInv[key];
+      setInventory(newInv);
+      await updateDoc(doc(db, "content", "settings"), { inventory: newInv });
+    }
   };
 
   const saveTimetable = async () => {
@@ -384,7 +403,6 @@ export default function AdminPage() {
                   onChange={(e) => setNewEvent({ ...newEvent, title: e.target.value })}
                 />
 
-                {/* Datum */}
                 <input
                   required
                   type="date"
@@ -393,7 +411,6 @@ export default function AdminPage() {
                   onChange={(e) => setNewEvent({ ...newEvent, date: e.target.value })}
                 />
 
-                {/* Tijdsloten (Van - Tot) - UPDATE */}
                 <div className="grid grid-cols-2 gap-2">
                   <div>
                     <label className="text-[10px] uppercase text-gray-500 font-bold">Starttijd</label>
@@ -687,14 +704,62 @@ export default function AdminPage() {
         {/* SETTINGS */}
         {activeTab === "settings" && (
           <div className="grid md:grid-cols-2 gap-8">
-            <div className="bg-slate-900 p-6 rounded-xl border border-slate-800">
-              <h3 className="font-bold mb-4">Algemene Instellingen</h3>
-              <label className="text-xs font-bold text-gray-500">Google Form URL</label>
-              <input
-                className="w-full bg-slate-950 border border-slate-700 p-3 rounded text-white mt-1"
-                value={settings.googleFormUrl}
-                onChange={(e) => setSettings({ ...settings, googleFormUrl: e.target.value })}
-              />
+            <div className="space-y-8">
+              <div className="bg-slate-900 p-6 rounded-xl border border-slate-800">
+                <h3 className="font-bold mb-4">Algemene Instellingen</h3>
+                <label className="text-xs font-bold text-gray-500">Google Form URL</label>
+                <input
+                  className="w-full bg-slate-950 border border-slate-700 p-3 rounded text-white mt-1"
+                  value={settings.googleFormUrl}
+                  onChange={(e) => setSettings({ ...settings, googleFormUrl: e.target.value })}
+                />
+              </div>
+
+              <div className="bg-slate-900 p-6 rounded-xl border border-slate-800">
+                <h3 className="font-bold mb-4">Inventory Beheer</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  {Object.entries(inventory).map(([key, count]) => (
+                    <div key={key}>
+                      <div className="flex justify-between items-center mb-1">
+                        <label className="text-xs font-bold text-gray-500 capitalize">
+                          {key === "pc" ? "Aantal PC's" : key === "ps5" ? "PS5 Consoles" : key === "switch" ? "Nintendo Switch" : key === "controller" ? "PS5 Controllers" : key}
+                        </label>
+                        <button onClick={() => handleRemoveInventoryItem(key)} className="text-red-500 hover:text-red-400 transition-colors">
+                          <X size={14} />
+                        </button>
+                      </div>
+                      <input
+                        type="number"
+                        className="w-full bg-slate-950 border border-slate-700 p-3 rounded text-white"
+                        value={count}
+                        onChange={(e) => setInventory({ ...inventory, [key]: parseInt(e.target.value) || 0 })}
+                      />
+                    </div>
+                  ))}
+                </div>
+
+                <div className="mt-6 pt-6 border-t border-slate-800">
+                  <label className="text-xs font-bold text-gray-500 block mb-2">Nieuw Item Toevoegen</label>
+                  <div className="flex gap-2">
+                    <input
+                      placeholder="Naam (bv. VR Headset)"
+                      className="flex-1 bg-slate-950 border border-slate-700 p-3 rounded text-white"
+                      value={newInventoryItem.name}
+                      onChange={(e) => setNewInventoryItem({ ...newInventoryItem, name: e.target.value })}
+                    />
+                    <input
+                      type="number"
+                      placeholder="Aantal"
+                      className="w-24 bg-slate-950 border border-slate-700 p-3 rounded text-white"
+                      value={newInventoryItem.count || ""}
+                      onChange={(e) => setNewInventoryItem({ ...newInventoryItem, count: parseInt(e.target.value) || 0 })}
+                    />
+                    <button onClick={handleAddInventoryItem} className="bg-blue-600 hover:bg-blue-500 text-white p-3 rounded-xl">
+                      <Plus size={20} />
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
             <div className="bg-slate-900 p-6 rounded-xl border border-slate-800">
               <h3 className="font-bold mb-4">Lijsten Beheren</h3>
