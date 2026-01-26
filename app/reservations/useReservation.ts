@@ -1,0 +1,163 @@
+import { useState, useEffect } from "react";
+import { doc, setDoc, arrayUnion, onSnapshot } from "firebase/firestore";
+import { db } from "../lib/firebase";
+
+// Types
+export type Reservation = {
+  date: string;
+  startTime: string;
+  endTime: string;
+  inventory: string;
+  controllers?: number;
+};
+
+export type DaySchedule = {
+  day: string;
+  slots: { start: string; end: string; type: "open" | "team" | "closed" }[];
+};
+
+// Helpers
+const timeToMins = (t: string) => {
+  const [h, m] = t.split(":").map(Number);
+  return h * 60 + m;
+};
+
+const minsToTime = (m: number) => {
+  const h = Math.floor(m / 60);
+  const min = m % 60;
+  return `${h.toString().padStart(2, "0")}:${min.toString().padStart(2, "0")}`;
+};
+
+export function useReservation() {
+  const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState(false);
+  const [error, setError] = useState("");
+
+  const [timetable, setTimetable] = useState<DaySchedule[]>([]);
+  const [existingReservations, setExistingReservations] = useState<Reservation[]>([]);
+  const [inventory, setInventory] = useState<Record<string, number>>({ pc: 5, ps5: 1, switch: 1, controller: 8 });
+
+  const [formData, setFormData] = useState({
+    sNumber: "",
+    email: "",
+    inventory: "pc",
+    date: "",
+    startTime: "",
+    duration: "60",
+    controllers: 1,
+    extraController: false,
+    acceptedTerms: false,
+  });
+
+  useEffect(() => {
+    const unsubRes = onSnapshot(doc(db, "content", "reservations"), (d) => {
+      if (d.exists()) setExistingReservations(d.data().reservations || []);
+    });
+    const unsubTime = onSnapshot(doc(db, "content", "timetable"), (d) => {
+      if (d.exists()) setTimetable(d.data().schedule || []);
+    });
+    const unsubSettings = onSnapshot(doc(db, "content", "settings"), (d) => {
+      if (d.exists()) setInventory(d.data().inventory || { pc: 5, ps5: 1, switch: 1, controller: 8 });
+    });
+    return () => {
+      unsubRes();
+      unsubTime();
+      unsubSettings();
+    };
+  }, []);
+
+  const getAvailableStartTimes = () => {
+    if (!formData.date) return [];
+
+    const dateObj = new Date(formData.date);
+    const daysMap = ["Zondag", "Maandag", "Dinsdag", "Woensdag", "Donderdag", "Vrijdag", "Zaterdag"];
+    const dayName = daysMap[dateObj.getDay()];
+    const daySchedule = timetable.find((d) => d.day === dayName);
+
+    if (!daySchedule) return [];
+
+    const availableTimes: string[] = [];
+    const requiredDuration = parseInt(formData.duration);
+
+    daySchedule.slots
+      .filter((s) => s.type === "open")
+      .forEach((slot) => {
+        let currentMins = timeToMins(slot.start);
+        const endMins = timeToMins(slot.end);
+
+        while (currentMins + requiredDuration <= endMins) {
+          const startStr = minsToTime(currentMins);
+          const endStr = minsToTime(currentMins + requiredDuration);
+
+          const hardwareCount = existingReservations.filter(
+            (r) => r.date === formData.date && r.inventory === formData.inventory && timeToMins(r.startTime) < timeToMins(endStr) && timeToMins(r.endTime) > currentMins,
+          ).length;
+
+          const maxHardware = inventory[formData.inventory] || 0;
+
+          let controllersNeeded = formData.inventory === "ps5" ? formData.controllers : formData.extraController ? 1 : 0;
+
+          const controllersInUse = existingReservations
+            .filter((r) => r.date === formData.date && timeToMins(r.startTime) < timeToMins(endStr) && timeToMins(r.endTime) > currentMins)
+            .reduce((sum, r) => sum + (r.controllers || 0), 0);
+
+          const maxControllers = inventory.controller || 0;
+
+          if (hardwareCount < maxHardware && (controllersNeeded === 0 || controllersInUse + controllersNeeded <= maxControllers)) {
+            availableTimes.push(startStr);
+          }
+
+          currentMins += 30;
+        }
+      });
+
+    return availableTimes;
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+
+    try {
+      if (!formData.sNumber.toLowerCase().startsWith("s")) throw new Error("Gebruik een geldig s-nummer.");
+      if (!formData.email.endsWith("@ap.be") && !formData.email.endsWith("@student.ap.be")) throw new Error("Gebruik je officiële AP email.");
+      if (!formData.startTime) throw new Error("Selecteer een starttijd.");
+
+      const startMins = timeToMins(formData.startTime);
+      const endMins = startMins + parseInt(formData.duration);
+      const endTime = minsToTime(endMins);
+      const controllersCount = formData.inventory === "ps5" ? formData.controllers : formData.extraController ? 1 : 0;
+
+      const newReservation = {
+        id: Date.now().toString(),
+        sNumber: formData.sNumber,
+        email: formData.email,
+        inventory: formData.inventory,
+        date: formData.date,
+        startTime: formData.startTime,
+        endTime: endTime,
+        controllers: controllersCount,
+        status: "active",
+        createdAt: new Date().toISOString(),
+      };
+
+      await setDoc(doc(db, "content", "reservations"), { reservations: arrayUnion(newReservation) }, { merge: true });
+      setSuccess(true);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return {
+    loading,
+    success,
+    error,
+    formData,
+    setFormData,
+    availableStartTimes: getAvailableStartTimes(),
+    handleSubmit,
+  };
+}

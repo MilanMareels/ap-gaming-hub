@@ -1,95 +1,13 @@
 "use client";
-import React, { useState } from "react";
-import { doc, setDoc, arrayUnion } from "firebase/firestore";
-import { db } from "../lib/firebase"; // Import je firebase config
-import { Calendar, Clock, Monitor, Gamepad2, CheckCircle, AlertTriangle } from "lucide-react";
-import WorkInProgress from "../components/WorkInProgress";
+import { Calendar, Monitor, Gamepad2, CheckCircle, AlertTriangle, Users, Gamepad } from "lucide-react";
+import { useReservation } from "./useReservation";
 
 export default function ReservationPage() {
-  const [loading, setLoading] = useState(false);
-  const [success, setSuccess] = useState(false);
-  const [error, setError] = useState("");
+  const { loading, success, error, formData, setFormData, availableStartTimes, handleSubmit } = useReservation();
 
-  const work: boolean = true;
-
-  const [formData, setFormData] = useState({
-    sNumber: "",
-    email: "",
-    inventory: "PC", // PC of PS5
-    date: "", // YYYY-MM-DD
-    startTime: "", // HH:MM
-    endTime: "", // HH:MM
-    acceptedTerms: false,
-  });
-
-  // Helper om te checken of datum "morgen" is
-  const validateDate = (dateStr: string) => {
-    const selected = new Date(dateStr);
-    const today = new Date();
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-
-    // Reset uren voor vergelijking
-    selected.setHours(0, 0, 0, 0);
-    tomorrow.setHours(0, 0, 0, 0);
-
-    return selected.getTime() === tomorrow.getTime();
-  };
-
-  const calculateDuration = (start: string, end: string) => {
-    const [startH, startM] = start.split(":").map(Number);
-    const [endH, endM] = end.split(":").map(Number);
-    return endH * 60 + endM - (startH * 60 + startM);
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError("");
-    setLoading(true);
-
-    try {
-      // 1. Validatie: S-Nummer
-      if (!formData.sNumber.toLowerCase().startsWith("s")) throw new Error("Gebruik een geldig s-nummer.");
-
-      // 2. Validatie: Email
-      if (!formData.email.endsWith("@ap.be") && !formData.email.endsWith("@student.ap.be")) {
-        throw new Error("Gebruik je officiële AP email.");
-      }
-
-      // 3. Validatie: Tijdslot (Min 1 uur, Max 2 uur)
-      const durationMinutes = calculateDuration(formData.startTime, formData.endTime);
-      if (durationMinutes < 60) throw new Error("Reservatie moet minimaal 1 uur duren.");
-      if (durationMinutes > 120) throw new Error("Reservatie mag maximaal 2 uur duren.");
-
-      // 4. Validatie: Datum (Moet morgen zijn)
-      // Als je strikt "1 dag op voorhand" wilt:
-      if (!validateDate(formData.date)) {
-        throw new Error("Je kan enkel reserveren voor de volgende dag.");
-      }
-
-      // 5. Submit naar Firebase
-      const newReservation = {
-        id: Date.now().toString(), // Unieke ID genereren
-        ...formData,
-        status: "active", // of 'pending'
-        createdAt: new Date().toISOString(),
-      };
-
-      await setDoc(
-        doc(db, "content", "reservations"),
-        {
-          reservations: arrayUnion(newReservation),
-        },
-        { merge: true },
-      );
-
-      setSuccess(true);
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const tomorrowStr = tomorrow.toISOString().split("T")[0];
 
   if (success) {
     return (
@@ -104,10 +22,6 @@ export default function ReservationPage() {
         </div>
       </div>
     );
-  }
-
-  if (work) {
-    return <WorkInProgress />;
   }
 
   return (
@@ -125,7 +39,6 @@ export default function ReservationPage() {
             </div>
           )}
 
-          {/* Student Info */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-bold text-gray-500 uppercase mb-1">S-Nummer</label>
@@ -151,74 +64,114 @@ export default function ReservationPage() {
             </div>
           </div>
 
-          {/* Inventory Selection */}
           <div>
             <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Kies Hardware</label>
-            <div className="grid grid-cols-2 gap-4">
-              <button
-                type="button"
-                onClick={() => setFormData({ ...formData, inventory: "PC" })}
-                className={`p-4 rounded-xl border flex flex-col items-center gap-2 transition-all ${
-                  formData.inventory === "PC" ? "bg-red-600 border-red-500 text-white" : "bg-slate-950 border-slate-800 text-gray-400 hover:border-gray-600"
-                }`}
-              >
-                <Monitor size={32} />
-                <span className="font-bold">High-End PC</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setFormData({ ...formData, inventory: "PS5" })}
-                className={`p-4 rounded-xl border flex flex-col items-center gap-2 transition-all ${
-                  formData.inventory === "PS5" ? "bg-blue-600 border-blue-500 text-white" : "bg-slate-950 border-slate-800 text-gray-400 hover:border-gray-600"
-                }`}
-              >
-                <Gamepad2 size={32} />
-                <span className="font-bold">PlayStation 5</span>
-              </button>
+            <div className="grid grid-cols-3 gap-4">
+              {[
+                { id: "pc", label: "PC", icon: Monitor, color: "red" },
+                { id: "ps5", label: "PS5", icon: Gamepad2, color: "blue" },
+                { id: "switch", label: "Switch", icon: Gamepad, color: "red" },
+              ].map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => setFormData({ ...formData, inventory: item.id, startTime: "" })} // Reset tijd bij wissel
+                  className={`p-4 rounded-xl border flex flex-col items-center gap-2 transition-all ${
+                    formData.inventory === item.id ? `bg-${item.color}-600 border-${item.color}-500 text-white` : "bg-slate-950 border-slate-800 text-gray-400 hover:border-gray-600"
+                  }`}
+                >
+                  <item.icon size={28} />
+                  <span className="font-bold text-sm">{item.label}</span>
+                </button>
+              ))}
             </div>
           </div>
 
-          {/* Datum & Tijd */}
+          {formData.inventory === "ps5" && (
+            <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
+              <label className="block text-xs font-bold text-gray-500 uppercase mb-2 items-center gap-2">
+                <Users size={14} /> Aantal Spelers (Controllers)
+              </label>
+              <div className="flex gap-2">
+                {[1, 2, 3, 4].map((n) => (
+                  <button
+                    key={n}
+                    type="button"
+                    onClick={() => setFormData({ ...formData, controllers: n, startTime: "" })}
+                    className={`flex-1 py-2 rounded-lg font-bold border ${formData.controllers === n ? "bg-blue-600 border-blue-500 text-white" : "bg-slate-900 border-slate-700 text-gray-400"}`}
+                  >
+                    {n}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {formData.inventory === "pc" && (
+            <div className="flex items-center gap-3 bg-slate-950 p-4 rounded-xl border border-slate-800">
+              <button
+                type="button"
+                onClick={() => setFormData({ ...formData, extraController: !formData.extraController, startTime: "" })}
+                className={`w-10 h-6 rounded-full p-1 transition-colors ${formData.extraController ? "bg-red-600" : "bg-slate-700"}`}
+              >
+                <div className={`w-4 h-4 bg-white rounded-full transition-transform ${formData.extraController ? "translate-x-4" : ""}`} />
+              </button>
+              <span className="text-sm text-gray-300 font-bold flex items-center gap-2">
+                <Gamepad2 size={16} /> Ik wil ook een controller gebruiken
+              </span>
+            </div>
+          )}
+
           <div className="p-4 bg-slate-950 rounded-xl border border-slate-800">
             <h3 className="font-bold text-gray-300 mb-4 flex items-center gap-2">
               <Calendar size={18} /> Planning
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
-                <label className="text-xs text-gray-500">Datum (Morgen)</label>
+                <label className="text-xs text-gray-500">Datum</label>
                 <input
                   required
                   type="date"
+                  min={tomorrowStr}
+                  max={tomorrowStr}
                   value={formData.date}
-                  onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                  onChange={(e) => setFormData({ ...formData, date: e.target.value, startTime: "" })}
                   className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 mt-1"
                 />
+              </div>
+              <div>
+                <label className="text-xs text-gray-500">Duur</label>
+                <select
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 mt-1 text-white"
+                  value={formData.duration}
+                  onChange={(e) => setFormData({ ...formData, duration: e.target.value, startTime: "" })}
+                >
+                  <option value="60">1 Uur</option>
+                  <option value="90">1.5 Uur</option>
+                  <option value="120">2 Uur</option>
+                </select>
               </div>
               <div>
                 <label className="text-xs text-gray-500">Start Tijd</label>
-                <input
+                <select
                   required
-                  type="time"
+                  disabled={!formData.date}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 mt-1 text-white disabled:opacity-50"
                   value={formData.startTime}
                   onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 mt-1"
-                />
-              </div>
-              <div>
-                <label className="text-xs text-gray-500">Eind Tijd</label>
-                <input
-                  required
-                  type="time"
-                  value={formData.endTime}
-                  onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 mt-1"
-                />
+                >
+                  <option value="">Kies tijd...</option>
+                  {availableStartTimes.map((t) => (
+                    <option key={t} value={t}>
+                      {t}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
-            <p className="text-xs text-gray-500 mt-2 italic">* Minimaal 1 uur, Maximaal 2 uur.</p>
+            {formData.date && availableStartTimes.length === 0 && <p className="text-xs text-red-400 mt-2">Geen beschikbare sloten voor deze selectie.</p>}
           </div>
 
-          {/* Terms */}
           <div className="flex items-start gap-3">
             <input
               type="checkbox"

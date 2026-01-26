@@ -15,7 +15,9 @@ export default function AdminPage() {
     setUser,
     loading,
     events,
-    reservations,
+    filteredReservations,
+    reservationFilterDate,
+    setReservationFilterDate,
     highscores,
     rosters,
     timetable,
@@ -95,6 +97,20 @@ export default function AdminPage() {
         {/* RESERVATIONS */}
         {activeTab === "reservations" && (
           <div className="bg-slate-900 rounded-xl border border-slate-800 overflow-hidden">
+            <div className="p-4 border-b border-slate-800 flex items-center gap-4 bg-slate-950">
+              <span className="text-sm font-bold text-gray-500 uppercase">Filter op datum:</span>
+              <input
+                type="date"
+                className="bg-slate-900 border border-slate-700 rounded p-2 text-white text-sm [&::-webkit-calendar-picker-indicator]:invert"
+                value={reservationFilterDate}
+                onChange={(e) => setReservationFilterDate(e.target.value)}
+              />
+              {reservationFilterDate && (
+                <button onClick={() => setReservationFilterDate("")} className="text-xs text-red-500 hover:underline">
+                  Reset Filter
+                </button>
+              )}
+            </div>
             <table className="w-full text-left text-sm">
               <thead className="bg-slate-950 text-gray-500 uppercase">
                 <tr>
@@ -106,7 +122,7 @@ export default function AdminPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800">
-                {reservations.map((r) => (
+                {filteredReservations.map((r) => (
                   <tr key={r.id}>
                     <td className="p-4 font-bold">
                       {r.sNumber}
@@ -126,7 +142,7 @@ export default function AdminPage() {
                     </td>
                   </tr>
                 ))}
-                {reservations.length === 0 && (
+                {filteredReservations.length === 0 && (
                   <tr>
                     <td colSpan={5} className="p-8 text-center text-gray-500">
                       Geen reservaties gevonden.

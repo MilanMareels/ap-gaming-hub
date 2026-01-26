@@ -28,6 +28,7 @@ export function useAdminData() {
   const [lists, setLists] = useState({ rosterGames: [], highscoreGames: [], eventTypes: [] });
   const [inventory, setInventory] = useState<Record<string, number>>({ pc: 5, ps5: 1, switch: 1, controller: 8 });
   const [newInventoryItem, setNewInventoryItem] = useState({ name: "", count: 0 });
+  const [reservationFilterDate, setReservationFilterDate] = useState("");
 
   const [newEvent, setNewEvent] = useState({ title: "", date: "", time: "", endTime: "", type: "Casual" });
   const [newPlayer, setNewPlayer] = useState({ name: "", handle: "", role: "", rank: "" });
@@ -259,12 +260,17 @@ export function useAdminData() {
     setLists({ ...lists, [type]: l });
   };
 
+  const filteredReservations = reservationFilterDate ? reservations.filter((r) => r.date === reservationFilterDate) : reservations;
+
   return {
     user,
     setUser,
     loading,
     events,
     reservations,
+    filteredReservations,
+    reservationFilterDate,
+    setReservationFilterDate,
     highscores,
     rosters,
     timetable,
