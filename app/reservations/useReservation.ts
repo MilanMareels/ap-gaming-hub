@@ -35,7 +35,7 @@ export function useReservation() {
 
   const [timetable, setTimetable] = useState<DaySchedule[]>([]);
   const [existingReservations, setExistingReservations] = useState<Reservation[]>([]);
-  const [inventory, setInventory] = useState<Record<string, number>>({ pc: 5, ps5: 1, switch: 1, controller: 8 });
+  const [inventory, setInventory] = useState<Record<string, number>>({ pc: 5, ps5: 1, switch: 1, controller: 8, "Nintendo Controllers": 4 });
 
   const [formData, setFormData] = useState({
     sNumber: "",
@@ -57,7 +57,7 @@ export function useReservation() {
       if (d.exists()) setTimetable(d.data().schedule || []);
     });
     const unsubSettings = onSnapshot(doc(db, "content", "settings"), (d) => {
-      if (d.exists()) setInventory(d.data().inventory || { pc: 5, ps5: 1, switch: 1, controller: 8 });
+      if (d.exists()) setInventory(d.data().inventory || { pc: 5, ps5: 1, switch: 1, controller: 8, "Nintendo Controllers": 4 });
     });
     return () => {
       unsubRes();
@@ -79,6 +79,10 @@ export function useReservation() {
     const availableTimes: string[] = [];
     const requiredDuration = parseInt(duration);
 
+    const now = new Date();
+    const isToday = date === now.toISOString().split("T")[0];
+    const currentTimeMins = now.getHours() * 60 + now.getMinutes();
+
     daySchedule.slots
       .filter((s) => s.type === "open")
       .forEach((slot) => {
@@ -86,6 +90,11 @@ export function useReservation() {
         const endMins = timeToMins(slot.end);
 
         while (currentMins + requiredDuration <= endMins) {
+          if (isToday && currentMins <= currentTimeMins) {
+            currentMins += 30;
+            continue;
+          }
+
           const startStr = minsToTime(currentMins);
           const endStr = minsToTime(currentMins + requiredDuration);
 

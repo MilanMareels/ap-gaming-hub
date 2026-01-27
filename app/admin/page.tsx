@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import { signOut } from "firebase/auth";
 import { auth } from "../lib/firebase";
-import { LogOut, Loader2, Plus, Trash2, Save, Check, Ban, X, Clock } from "lucide-react";
+import { LogOut, Loader2, Plus, Trash2, Save, Check, Ban, X, Clock, Gamepad2 } from "lucide-react";
 import { LoginScreen } from "./LoginScreen";
 import { useAdminData } from "./useAdminData";
 
@@ -117,12 +117,12 @@ export default function AdminPage() {
                   <th className="p-4">Student</th>
                   <th className="p-4">Datum</th>
                   <th className="p-4">Tijd</th>
-                  <th className="p-4">Item</th>
+                  <th className="p-4">Hardware & Info</th>
                   <th className="p-4 text-right">Actie</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800">
-                {filteredReservations.map((r) => (
+                {filteredReservations.map((r: any) => (
                   <tr key={r.id}>
                     <td className="p-4 font-bold">
                       {r.sNumber}
@@ -133,7 +133,18 @@ export default function AdminPage() {
                       {r.startTime} - {r.endTime}
                     </td>
                     <td className="p-4">
-                      <span className={`px-2 py-1 rounded text-xs font-bold ${r.inventory === "PC" ? "bg-red-900/30 text-red-400" : "bg-blue-900/30 text-blue-400"}`}>{r.inventory}</span>
+                      <div className="flex flex-col gap-1 items-start">
+                        <span
+                          className={`px-2 py-1 rounded text-xs font-bold uppercase ${["pc", "switch"].includes(r.inventory.toLowerCase()) ? "bg-red-900/30 text-red-400" : "bg-blue-900/30 text-blue-400"}`}
+                        >
+                          {r.inventory}
+                        </span>
+                        {r.controllers && r.controllers > 0 && (
+                          <span className="text-xs text-gray-400 flex items-center gap-1">
+                            <Gamepad2 size={12} /> {r.controllers} {r.controllers === 1 ? "Speler" : "Spelers"}
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="p-4 text-right">
                       <button onClick={() => handleDeleteReservation(r)} className="text-red-500 hover:bg-red-900/20 p-2 rounded">
@@ -487,7 +498,17 @@ export default function AdminPage() {
                     <div key={key}>
                       <div className="flex justify-between items-center mb-1">
                         <label className="text-xs font-bold text-gray-500 capitalize">
-                          {key === "pc" ? "Aantal PC's" : key === "ps5" ? "PS5 Consoles" : key === "switch" ? "Nintendo Switch" : key === "controller" ? "PS5 Controllers" : key}
+                          {key === "pc"
+                            ? "Aantal PC's"
+                            : key === "ps5"
+                              ? "PS5 Consoles"
+                              : key === "switch"
+                                ? "Nintendo Switch"
+                                : key === "controller"
+                                  ? "PS5 Controllers"
+                                  : key === "Nintendo Controllers"
+                                    ? "Nintendo Controllers"
+                                    : key}
                         </label>
                         <button onClick={() => handleRemoveInventoryItem(key)} className="text-red-500 hover:text-red-400 transition-colors">
                           <X size={14} />
