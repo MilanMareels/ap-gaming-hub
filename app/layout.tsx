@@ -17,7 +17,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="nl" className="scroll-smooth">
       <body className={`${inter.className} bg-slate-950 text-white`}>
         <Navbar />
-
         {children}
         <Analytics />
         <Footer />

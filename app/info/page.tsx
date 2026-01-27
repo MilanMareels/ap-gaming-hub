@@ -1,17 +1,30 @@
 "use client";
 
-import { useState } from "react";
-import { Shield, MessageCircle, ChevronDown, ChevronUp } from "lucide-react";
+import { useState, useEffect } from "react";
+import { doc, getDoc } from "firebase/firestore";
+import { Shield, MessageCircle, ChevronDown, ChevronUp, ClipboardList } from "lucide-react";
+import { db } from "../lib/firebase";
 import { ScrollReveal } from "../components/ScrollReveal";
 
 export default function InfoPage() {
   const [openIndex, setOpenIndex] = useState<number | null>(null);
+  const [formUrl, setFormUrl] = useState("");
+
+  useEffect(() => {
+    const fetchSettings = async () => {
+      const docRef = doc(db, "content", "settings");
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) {
+        setFormUrl(docSnap.data().settings.googleFormUrl || "");
+      }
+    };
+    fetchSettings();
+  }, []);
 
   const faqs = [
     {
       question: "Hoe reserveer ik een plaats?",
-      answer:
-        "Ga naar de 'Reservations' pagina via het menu. Vul je studentennummer en AP-email in, kies of je een PC of PS5 wilt gebruiken, en selecteer een beschikbaar tijdslot voor de volgende dag.",
+      answer: "Ga naar de 'Reservations' pagina via het menu. Vul je studentennummer en AP-email in, kies of je een PC of PS5 wilt gebruiken, en selecteer een beschikbaar tijdslot.",
     },
     {
       question: "Wat als ik niet kom opdagen bij mijn reservatie?",
@@ -20,12 +33,11 @@ export default function InfoPage() {
     },
     {
       question: "Hoe join ik een gaming team?",
-      answer:
-        "Join onze Discord server! In het kanaal #team-finder kan je oproepjes plaatsen of reageren op teams die spelers zoeken voor games zoals Valorant, League of Legends, Rocket League en meer.",
+      answer: "",
     },
     {
       question: "Welke consoles en games zijn er?",
-      answer: "We hebben meerdere PlayStation 5 consoles met populaire games zoals EA FC 24, Tekken 8, Street Fighter 6 en Call of Duty vooraf geïnstalleerd.",
+      answer: "We hebben meerdere PlayStation 5 games zoals  vooraf geïnstalleerd.",
     },
     {
       question: "Welke PC's zijn er?",
@@ -74,6 +86,19 @@ export default function InfoPage() {
             </div>
           </div>
 
+          {formUrl && (
+            <div className="mb-16">
+              <h2 className="text-3xl font-bold mb-8 text-center flex items-center justify-center gap-3">
+                <ClipboardList className="text-red-600" size={32} /> Aanvraag / Feedback
+              </h2>
+              <div className="bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden h-200 shadow-2xl">
+                <iframe src={formUrl} className="w-full h-full border-0" title="Google Form">
+                  Laden...
+                </iframe>
+              </div>
+            </div>
+          )}
+
           <div className="max-w-7xl mx-auto">
             <h2 className="text-3xl font-bold mb-8 text-center">Veelgestelde Vragen</h2>
             <div className="space-y-4">
@@ -86,7 +111,7 @@ export default function InfoPage() {
                     {faq.question}
                     {openIndex === index ? <ChevronUp className="text-red-500" /> : <ChevronDown className="text-gray-500" />}
                   </button>
-                  {openIndex === index && <div className="p-6 pt-0 text-gray-400 border-t border-slate-800/50 leading-relaxed">{faq.answer}</div>}
+                  {openIndex === index && <div className="p-6 pt-2 text-gray-400 border-t border-slate-800/50 leading-relaxed">{faq.answer}</div>}
                 </div>
               ))}
             </div>
