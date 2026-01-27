@@ -1,4 +1,3 @@
-// Admin Page types
 export interface EventItem {
   id: string;
   title: string;
@@ -23,6 +22,9 @@ export interface Reservation {
   date: string;
   startTime: string;
   endTime: string;
+  controllers?: number;
+  status?: string;
+  createdAt?: string;
 }
 
 export interface RosterData {

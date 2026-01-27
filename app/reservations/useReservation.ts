@@ -1,20 +1,7 @@
 import { useState, useEffect } from "react";
 import { doc, setDoc, arrayUnion, onSnapshot } from "firebase/firestore";
 import { db } from "../lib/firebase";
-
-// Types
-export type Reservation = {
-  date: string;
-  startTime: string;
-  endTime: string;
-  inventory: string;
-  controllers?: number;
-};
-
-export type DaySchedule = {
-  day: string;
-  slots: { start: string; end: string; type: "open" | "team" | "closed" }[];
-};
+import { DaySchedule, Reservation } from "../lib/types";
 
 // Helpers
 const timeToMins = (t: string) => {

@@ -122,7 +122,7 @@ export default function AdminPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800">
-                {filteredReservations.map((r: any) => (
+                {filteredReservations.map((r) => (
                   <tr key={r.id}>
                     <td className="p-4 font-bold">
                       {r.sNumber}
