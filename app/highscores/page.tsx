@@ -4,6 +4,7 @@ import { doc, onSnapshot, setDoc, arrayUnion } from "firebase/firestore";
 import { db } from "../lib/firebase";
 import { Medal, Loader2, Trophy, Gamepad2 } from "lucide-react";
 import { ScrollReveal } from "../components/ScrollReveal";
+import WorkInProgress from "../components/WorkInProgress";
 
 export default function HighscoresPage() {
   const [highscores, setHighscores] = useState<any[]>([]);
@@ -75,6 +76,10 @@ export default function HighscoresPage() {
   };
 
   const filteredScores = highscores.filter((h: any) => h.status === "approved" && h.game === selectedGame);
+
+  if (true) {
+    return <WorkInProgress />;
+  }
 
   return (
     <div className="min-h-screen bg-slate-950 text-white py-24 px-4 relative overflow-hidden">
