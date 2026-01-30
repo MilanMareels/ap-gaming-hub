@@ -139,9 +139,10 @@ export default function AdminPage() {
                         >
                           {r.inventory}
                         </span>
-                        {r.controllers && r.controllers > 0 && (
+                        {((r.controllers || 0) > 0 || r.inventory.toLowerCase() === "pc") && (
                           <span className="text-xs text-gray-400 flex items-center gap-1">
-                            <Gamepad2 size={12} /> {r.controllers} {r.controllers === 1 ? "Speler" : "Spelers"}
+                            <Gamepad2 size={12} />
+                            {r.inventory.toLowerCase() === "pc" ? `1 Speler${(r.controllers || 0) > 0 ? " (+ Controller)" : ""}` : `${r.controllers} ${r.controllers === 1 ? "Speler" : "Spelers"}`}
                           </span>
                         )}
                       </div>
