@@ -1,9 +1,10 @@
 "use client";
+import { useState } from "react";
 import { Calendar, Monitor, Gamepad2, CheckCircle, AlertTriangle, Users, Gamepad } from "lucide-react";
 import { useReservation } from "./useReservation";
 
 export default function ReservationPage() {
-  const { loading, success, error, formData, setFormData, availableStartTimes, handleSubmit, checkAvailability, inventory } = useReservation();
+  const { loading, success, error, formData, setFormData, availableStartTimes, handleSubmit, checkAvailability, inventory, existingReservations } = useReservation();
 
   const today = new Date();
   const todayStr = today.toISOString().split("T")[0];
@@ -11,6 +12,71 @@ export default function ReservationPage() {
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
   const tomorrowStr = tomorrow.toISOString().split("T")[0];
+
+  const [localError, setLocalError] = useState("");
+  const [checking, setChecking] = useState(false);
+
+  const handleCheckAndSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLocalError("");
+    setChecking(true);
+
+    try {
+      if (formData.sNumber && formData.date && formData.startTime) {
+        let totalDuration = 0;
+        let hasOverlap = false;
+
+        const newStartParts = formData.startTime.split(":").map(Number);
+        const newStartMin = newStartParts[0] * 60 + newStartParts[1];
+        const newDuration = parseInt(formData.duration || "60");
+        const newEndMin = newStartMin + newDuration;
+        const currentSNumber = formData.sNumber.trim().toLowerCase();
+
+        existingReservations.forEach((data) => {
+          if (data.date !== formData.date || data.status !== "active") return;
+
+          if (data.sNumber && data.sNumber.trim().toLowerCase() === currentSNumber) {
+            const startParts = data.startTime.split(":").map(Number);
+            const startMin = startParts[0] * 60 + startParts[1];
+
+            let endMin;
+            if (data.endTime) {
+              const endParts = data.endTime.split(":").map(Number);
+              endMin = endParts[0] * 60 + endParts[1];
+            } else {
+              endMin = startMin + (parseInt((data as any).duration) || 60);
+            }
+
+            totalDuration += endMin - startMin;
+
+            if (newStartMin < endMin && newEndMin > startMin) {
+              hasOverlap = true;
+            }
+          }
+        });
+
+        if (hasOverlap) {
+          setLocalError("Je hebt al een reservatie die overlapt met dit tijdslot.");
+          setChecking(false);
+          return;
+        }
+
+        if (totalDuration + newDuration > 120) {
+          setLocalError(`Je mag maximaal 2 uur per dag reserveren. Je hebt al ${totalDuration / 60} uur gereserveerd.`);
+          setChecking(false);
+          return;
+        }
+      }
+
+      // Als alles in orde is, voer de originele submit uit
+      handleSubmit(e);
+    } catch (err) {
+      console.error("Error checking reservations:", err);
+      setLocalError("Kon reservaties niet controleren. Probeer het later opnieuw.");
+    } finally {
+      setChecking(false);
+    }
+  };
 
   if (success) {
     return (
@@ -35,10 +101,10 @@ export default function ReservationPage() {
         </h1>
         <p className="text-gray-400 mb-8">Boek een PC of PS5. Let op de regels.</p>
 
-        <form onSubmit={handleSubmit} className="bg-slate-900 border border-slate-800 p-8 rounded-3xl space-y-6 shadow-xl">
-          {error && (
+        <form onSubmit={handleCheckAndSubmit} className="bg-slate-900 border border-slate-800 p-8 rounded-3xl space-y-6 shadow-xl">
+          {(error || localError) && (
             <div className="bg-red-900/20 border border-red-500/50 text-red-200 p-4 rounded-xl flex items-center gap-3">
-              <AlertTriangle size={20} /> {error}
+              <AlertTriangle size={20} /> {localError || error}
             </div>
           )}
 
@@ -207,8 +273,8 @@ export default function ReservationPage() {
             </label>
           </div>
 
-          <button type="submit" disabled={loading} className="w-full bg-white text-slate-950 font-black py-4 rounded-xl hover:bg-gray-200 transition-colors disabled:opacity-50">
-            {loading ? "Bezig met boeken..." : "RESERVEER NU"}
+          <button type="submit" disabled={loading || checking} className="w-full bg-white text-slate-950 font-black py-4 rounded-xl hover:bg-gray-200 transition-colors disabled:opacity-50">
+            {loading || checking ? "Bezig met controleren..." : "RESERVEER NU"}
           </button>
         </form>
       </div>

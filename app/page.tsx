@@ -16,8 +16,8 @@ export default function HomePage() {
           <Link href="/reservations" className="bg-red-600 hover:bg-red-700 text-white px-8 py-4 rounded-xl font-bold transition-all">
             Reserveer
           </Link>
-          <Link href="/roster" className="bg-slate-800 border border-slate-700 text-white px-8 py-4 rounded-xl font-bold hover:bg-slate-700">
-            Bekijk openings uren
+          <Link href="/schedule" className="bg-slate-800 border border-slate-700 text-white px-8 py-4 rounded-xl font-bold hover:bg-slate-700">
+            Openings uren
           </Link>
         </div>
       </div>

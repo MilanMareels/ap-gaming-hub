@@ -174,5 +174,6 @@ export function useReservation() {
     checkAvailability,
     handleSubmit,
     inventory,
+    existingReservations,
   };
 }
