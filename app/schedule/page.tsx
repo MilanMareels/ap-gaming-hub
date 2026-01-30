@@ -8,6 +8,8 @@ import { ScrollReveal } from "../components/ScrollReveal";
 export default function SchedulePage() {
   const [schedule, setSchedule] = useState<any[]>([]);
 
+  const refeshTime: number = 60000;
+
   // Standaard status is gesloten (Rood)
   const [liveStatus, setLiveStatus] = useState({
     status: "CLOSED",
@@ -36,13 +38,11 @@ export default function SchedulePage() {
       const now = new Date();
       const daysMap = ["Zondag", "Maandag", "Dinsdag", "Woensdag", "Donderdag", "Vrijdag", "Zaterdag"];
 
-      const currentDayName = daysMap[now.getDay()]; // Haal de naam van vandaag op
+      const currentDayName = daysMap[now.getDay()];
       const currentMins = now.getHours() * 60 + now.getMinutes();
 
-      // Zoek het schema van vandaag in de gefilterde schedule
       const todaySchedule = schedule.find((d: any) => d.day === currentDayName);
 
-      // Als er vandaag geen schema is gevonden (dus ook in het weekend), zet op GESLOTEN
       if (!todaySchedule) {
         setLiveStatus({ status: "CLOSED", label: "Gesloten", color: "red" });
         return;
@@ -90,11 +90,9 @@ export default function SchedulePage() {
     };
 
     check();
-    const interval = setInterval(check, 60000); // Elke minuut updaten
+    const interval = setInterval(check, refeshTime); // Elke minuut updaten
     return () => clearInterval(interval);
   }, [schedule]);
-
-  // --- STYLING HELPERS ---
 
   const getStatusClasses = () => {
     switch (liveStatus.color) {
