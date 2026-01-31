@@ -2,6 +2,8 @@
 import { useState } from "react";
 import { Calendar, Monitor, Gamepad2, CheckCircle, AlertTriangle, Users, Gamepad } from "lucide-react";
 import { useReservation } from "./useReservation";
+import { doc, getDoc } from "firebase/firestore";
+import { db } from "../lib/firebase";
 
 export default function ReservationPage() {
   const { loading, success, error, formData, setFormData, availableStartTimes, handleSubmit, checkAvailability, inventory, existingReservations } = useReservation();
@@ -32,6 +34,19 @@ export default function ReservationPage() {
         const newDuration = parseInt(formData.duration || "60");
         const newEndMin = newStartMin + newDuration;
         const currentSNumber = formData.sNumber.trim().toLowerCase();
+
+        // Check op strikes (No-Shows)
+        const logsRef = doc(db, "content", "logs");
+        const logsSnap = await getDoc(logsRef);
+        if (logsSnap.exists()) {
+          const logsData = logsSnap.data();
+          const userStrikes = (logsData.noShows || []).filter((log: any) => log.sNumber && log.sNumber.trim().toLowerCase() === currentSNumber);
+          if (userStrikes.length >= 3) {
+            setLocalError("Je account is geblokkeerd vanwege 3 no-shows. Contacteer een admin om je account te deblokkeren.");
+            setChecking(false);
+            return;
+          }
+        }
 
         existingReservations.forEach((data) => {
           if (data.date !== formData.date || !["not-present", "booked", "present"].includes(data.status!)) return;

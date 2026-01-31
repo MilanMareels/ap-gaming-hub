@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { signOut } from "firebase/auth";
 import { auth, db } from "../lib/firebase";
 import { doc, getDoc, updateDoc, setDoc, onSnapshot } from "firebase/firestore";
-import { LogOut, Loader2, Plus, Trash2, Save, Check, Ban, X, Clock, Gamepad2, UserCheck, UserX, AlertOctagon } from "lucide-react";
+import { LogOut, Loader2, Plus, Trash2, Save, Check, Ban, X, Clock, Gamepad2, UserCheck, UserX, AlertOctagon, ShieldCheck } from "lucide-react";
 import { LoginScreen } from "./LoginScreen";
 import { useAdminData } from "./useAdminData";
 
@@ -105,6 +105,23 @@ export default function AdminPage() {
       }
     } catch (error) {
       console.error("Error updating status:", error);
+    }
+  };
+
+  const handleResetStrikes = async (sNumber: string) => {
+    if (!confirm(`Weet je zeker dat je de strikes voor ${sNumber} wilt resetten? Dit deblokkeert de student.`)) return;
+
+    try {
+      const logsRef = doc(db, "content", "logs");
+      const logsSnap = await getDoc(logsRef);
+
+      if (logsSnap.exists()) {
+        const currentNoShows = logsSnap.data().noShows || [];
+        const updatedNoShows = currentNoShows.filter((log: any) => log.sNumber !== sNumber);
+        await updateDoc(logsRef, { noShows: updatedNoShows });
+      }
+    } catch (error) {
+      console.error("Error resetting strikes:", error);
     }
   };
 
@@ -340,6 +357,7 @@ export default function AdminPage() {
                   <th className="p-4">Student</th>
                   <th className="p-4">Aantal No-Shows</th>
                   <th className="p-4">Geschiedenis</th>
+                  <th className="p-4 text-right">Actie</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800">
@@ -363,11 +381,16 @@ export default function AdminPage() {
                         <span className="bg-red-600 text-white px-3 py-1 rounded-full font-bold text-xs">{s.count}x</span>
                       </td>
                       <td className="p-4 text-gray-400 text-xs">{s.history.join(", ")}</td>
+                      <td className="p-4 text-right">
+                        <button onClick={() => handleResetStrikes(s.sNumber)} className="text-green-500 hover:bg-green-900/20 p-2 rounded flex items-center gap-2 ml-auto text-xs font-bold uppercase">
+                          <ShieldCheck size={16} /> Deblokkeer
+                        </button>
+                      </td>
                     </tr>
                   ))}
                 {noShows.length === 0 && (
                   <tr>
-                    <td colSpan={3} className="p-8 text-center text-gray-500">
+                    <td colSpan={4} className="p-8 text-center text-gray-500">
                       Geen no-shows geregistreerd.
                     </td>
                   </tr>

@@ -19,4 +19,13 @@ export const faqs = [
     question: "Hoelang mag ik huren en blijven gamen?",
     answer: "Je kan maximaal 4 uur per dag reserveren. Dit limiet zorgt ervoor dat zoveel mogelijk studenten gebruik kunnen maken van de faciliteiten.",
   },
+  {
+    question: "Kan ik ook op de PS5 of Nintendo Switch spelen?",
+    answer:
+      "Zeker! Naast de PC's hebben we consoles met populaire titels. Voor PS5 hebben we o.a. FC 26, Elden Ring en Gran Turismo 7. Voor de Switch zijn er partygames zoals Mario Kart 8 en Super Smash Bros Ultimate.",
+  },
+  {
+    question: "Hoe werken de 'Fysieke' games in de lijst?",
+    answer: "Games die als 'Fysiek' staan aangegeven (vooral Switch en sommige PS5 titels) moet je even ophalen bij de beheerder. We vragen meestal je studentenkaart als tijdelijk onderpand.",
+  },
 ];
