@@ -10,7 +10,7 @@ export default function ReservationPage() {
   const todayStr = today.toISOString().split("T")[0];
 
   const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
+  tomorrow.setDate(tomorrow.getDate() + 1); // Vandaag + Morgen alleen.
   const tomorrowStr = tomorrow.toISOString().split("T")[0];
 
   const [localError, setLocalError] = useState("");

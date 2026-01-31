@@ -1,15 +1,25 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { signOut } from "firebase/auth";
 import { auth, db } from "../lib/firebase";
-import { doc, getDoc, updateDoc } from "firebase/firestore";
-import { LogOut, Loader2, Plus, Trash2, Save, Check, Ban, X, Clock, Gamepad2, UserCheck, UserX } from "lucide-react";
+import { doc, getDoc, updateDoc, setDoc, onSnapshot } from "firebase/firestore";
+import { LogOut, Loader2, Plus, Trash2, Save, Check, Ban, X, Clock, Gamepad2, UserCheck, UserX, AlertOctagon } from "lucide-react";
 import { LoginScreen } from "./LoginScreen";
 import { useAdminData } from "./useAdminData";
 
 export default function AdminPage() {
   const [activeTab, setActiveTab] = useState("timetable");
+  const [noShows, setNoShows] = useState<any[]>([]);
+
+  useEffect(() => {
+    const unsub = onSnapshot(doc(db, "content", "logs"), (docSnap) => {
+      if (docSnap.exists()) {
+        setNoShows(docSnap.data().noShows || []);
+      }
+    });
+    return () => unsub();
+  }, []);
 
   const {
     user,
@@ -55,12 +65,43 @@ export default function AdminPage() {
 
   const handleStatusUpdate = async (reservationId: string, newStatus: string) => {
     try {
-      const docRef = doc(db, "content", "reservations");
-      const docSnap = await getDoc(docRef);
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        const updatedReservations = data.reservations.map((r: any) => (r.id === reservationId ? { ...r, status: newStatus } : r));
-        await updateDoc(docRef, { reservations: updatedReservations });
+      const resRef = doc(db, "content", "reservations");
+
+      if (newStatus === "not-present") {
+        const resSnap = await getDoc(resRef);
+        if (resSnap.exists()) {
+          const data = resSnap.data();
+          const reservation = data.reservations.find((r: any) => r.id === reservationId);
+
+          if (reservation) {
+            // 1. Verwijder uit actieve reservaties (maakt slot vrij)
+            const updatedReservations = data.reservations.filter((r: any) => r.id !== reservationId);
+            await updateDoc(resRef, { reservations: updatedReservations });
+
+            // 2. Voeg toe aan logs (No-Shows)
+            const logsRef = doc(db, "content", "logs");
+            const logsSnap = await getDoc(logsRef);
+            const logEntry = {
+              ...reservation,
+              status: "not-present",
+              loggedAt: new Date().toISOString(),
+            };
+
+            if (logsSnap.exists()) {
+              const currentLogs = logsSnap.data().noShows || [];
+              await updateDoc(logsRef, { noShows: [...currentLogs, logEntry] });
+            } else {
+              await setDoc(logsRef, { noShows: [logEntry] });
+            }
+          }
+        }
+      } else {
+        const docSnap = await getDoc(resRef);
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          const updatedReservations = data.reservations.map((r: any) => (r.id === reservationId ? { ...r, status: newStatus } : r));
+          await updateDoc(resRef, { reservations: updatedReservations });
+        }
       }
     } catch (error) {
       console.error("Error updating status:", error);
@@ -93,6 +134,7 @@ export default function AdminPage() {
             { id: "reservations", label: "Reservaties" },
             { id: "events", label: "Events" },
             { id: "scores", label: "Highscores" },
+            { id: "noshows", label: "No-Shows" },
             { id: "rosters", label: "Teams" },
             { id: "timetable", label: "Openingsuren" },
             { id: "settings", label: "Instellingen" },
@@ -280,6 +322,58 @@ export default function AdminPage() {
                 </div>
               ))}
             </div>
+          </div>
+        )}
+
+        {/* NO SHOWS */}
+        {activeTab === "noshows" && (
+          <div className="bg-slate-900 rounded-xl border border-slate-800 overflow-hidden">
+            <div className="p-6 border-b border-slate-800">
+              <h3 className="font-bold text-xl flex items-center gap-2">
+                <AlertOctagon className="text-red-500" /> No-Show Logboek
+              </h3>
+              <p className="text-gray-400 text-sm mt-1">Lijst van studenten die niet zijn komen opdagen. Gebruik dit voor strikes.</p>
+            </div>
+            <table className="w-full text-left text-sm">
+              <thead className="bg-slate-950 text-gray-500 uppercase">
+                <tr>
+                  <th className="p-4">Student</th>
+                  <th className="p-4">Aantal No-Shows</th>
+                  <th className="p-4">Geschiedenis</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800">
+                {Object.values(
+                  noShows.reduce((acc: any, curr: any) => {
+                    const key = curr.sNumber;
+                    if (!acc[key]) acc[key] = { ...curr, count: 0, history: [] };
+                    acc[key].count++;
+                    acc[key].history.push(`${curr.date} (${curr.startTime})`);
+                    return acc;
+                  }, {}),
+                )
+                  .sort((a: any, b: any) => b.count - a.count)
+                  .map((s: any) => (
+                    <tr key={s.sNumber}>
+                      <td className="p-4 font-bold">
+                        {s.sNumber}
+                        <div className="text-xs text-gray-500 font-normal">{s.email}</div>
+                      </td>
+                      <td className="p-4">
+                        <span className="bg-red-600 text-white px-3 py-1 rounded-full font-bold text-xs">{s.count}x</span>
+                      </td>
+                      <td className="p-4 text-gray-400 text-xs">{s.history.join(", ")}</td>
+                    </tr>
+                  ))}
+                {noShows.length === 0 && (
+                  <tr>
+                    <td colSpan={3} className="p-8 text-center text-gray-500">
+                      Geen no-shows geregistreerd.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
           </div>
         )}
 
