@@ -120,11 +120,11 @@ export function useReservation() {
     return availableTimes;
   };
 
-  const availableStartTimes = calculateAvailableStartTimes(formData.date, formData.duration, formData.inventory, formData.controllers, formData.extraController);
+  const availableStartTimes = calculateAvailableStartTimes(formData.date, formData.duration || "60", formData.inventory, formData.controllers, formData.extraController);
 
   const checkAvailability = (count: number) => {
     if (!formData.date) return true;
-    return calculateAvailableStartTimes(formData.date, formData.duration, formData.inventory, count, formData.extraController).length > 0;
+    return calculateAvailableStartTimes(formData.date, formData.duration || "60", formData.inventory, count, formData.extraController).length > 0;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -138,7 +138,7 @@ export function useReservation() {
       if (!formData.startTime) throw new Error("Selecteer een starttijd.");
 
       const startMins = timeToMins(formData.startTime);
-      const endMins = startMins + parseInt(formData.duration);
+      const endMins = startMins + parseInt(formData.duration || "60");
       const endTime = minsToTime(endMins);
       const controllersCount = formData.inventory === "ps5" || formData.inventory === "switch" ? formData.controllers : formData.extraController ? 1 : 0;
 
@@ -151,7 +151,7 @@ export function useReservation() {
         startTime: formData.startTime,
         endTime: endTime,
         controllers: controllersCount,
-        status: "active",
+        status: "booked",
         createdAt: new Date().toISOString(),
       };
 

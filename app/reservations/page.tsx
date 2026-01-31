@@ -33,7 +33,7 @@ export default function ReservationPage() {
         const currentSNumber = formData.sNumber.trim().toLowerCase();
 
         existingReservations.forEach((data) => {
-          if (data.date !== formData.date || data.status !== "active") return;
+          if (data.date !== formData.date || !["not-present", "booked", "present"].includes(data.status!)) return;
 
           if (data.sNumber && data.sNumber.trim().toLowerCase() === currentSNumber) {
             const startParts = data.startTime.split(":").map(Number);

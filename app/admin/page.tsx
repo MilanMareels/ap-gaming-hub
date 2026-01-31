@@ -1,9 +1,10 @@
 "use client";
 
-import React, { useState } from "react";
+import { useState } from "react";
 import { signOut } from "firebase/auth";
-import { auth } from "../lib/firebase";
-import { LogOut, Loader2, Plus, Trash2, Save, Check, Ban, X, Clock, Gamepad2 } from "lucide-react";
+import { auth, db } from "../lib/firebase";
+import { doc, getDoc, updateDoc } from "firebase/firestore";
+import { LogOut, Loader2, Plus, Trash2, Save, Check, Ban, X, Clock, Gamepad2, UserCheck, UserX } from "lucide-react";
 import { LoginScreen } from "./LoginScreen";
 import { useAdminData } from "./useAdminData";
 
@@ -51,6 +52,20 @@ export default function AdminPage() {
     addListItem,
     removeListItem,
   } = useAdminData();
+
+  const handleStatusUpdate = async (reservationId: string, newStatus: string) => {
+    try {
+      const docRef = doc(db, "content", "reservations");
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        const updatedReservations = data.reservations.map((r: any) => (r.id === reservationId ? { ...r, status: newStatus } : r));
+        await updateDoc(docRef, { reservations: updatedReservations });
+      }
+    } catch (error) {
+      console.error("Error updating status:", error);
+    }
+  };
 
   if (loading)
     return (
@@ -118,6 +133,7 @@ export default function AdminPage() {
                   <th className="p-4">Datum</th>
                   <th className="p-4">Tijd</th>
                   <th className="p-4">Hardware & Info</th>
+                  <th className="p-4">Status</th>
                   <th className="p-4 text-right">Actie</th>
                 </tr>
               </thead>
@@ -147,7 +163,32 @@ export default function AdminPage() {
                         )}
                       </div>
                     </td>
+                    <td className="p-4">
+                      {r.status === "present" ? (
+                        <span className="text-green-500 font-bold text-xs uppercase bg-green-900/20 px-2 py-1 rounded flex w-fit items-center gap-1">
+                          <Check size={12} /> Aanwezig
+                        </span>
+                      ) : r.status === "not-present" ? (
+                        <span className="text-red-500 font-bold text-xs uppercase bg-red-900/20 px-2 py-1 rounded flex w-fit items-center gap-1">
+                          <UserX size={12} /> Afwezig
+                        </span>
+                      ) : (
+                        <span className="text-yellow-500 font-bold text-xs uppercase bg-yellow-900/20 px-2 py-1 rounded">
+                          {r.status === "active" ? "Geboekt" : r.status === "booked" ? "Geboekt" : r.status}
+                        </span>
+                      )}
+                    </td>
                     <td className="p-4 text-right">
+                      {r.status !== "present" && r.status !== "not-present" && (
+                        <>
+                          <button onClick={() => handleStatusUpdate(r.id, "present")} className="text-green-500 hover:bg-green-900/20 p-2 rounded mr-2" title="Markeer als aanwezig">
+                            <UserCheck size={16} />
+                          </button>
+                          <button onClick={() => handleStatusUpdate(r.id, "not-present")} className="text-orange-500 hover:bg-orange-900/20 p-2 rounded mr-2" title="Markeer als afwezig">
+                            <UserX size={16} />
+                          </button>
+                        </>
+                      )}
                       <button onClick={() => handleDeleteReservation(r)} className="text-red-500 hover:bg-red-900/20 p-2 rounded">
                         <Trash2 size={16} />
                       </button>
