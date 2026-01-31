@@ -1,5 +1,4 @@
 "use client";
-import { useState } from "react";
 import { Calendar, Monitor, Gamepad2, CheckCircle, AlertTriangle, Users, Gamepad } from "lucide-react";
 import { useReservation } from "./useReservation";
 
@@ -10,7 +9,7 @@ export default function ReservationPage() {
   const todayStr = today.toISOString().split("T")[0];
 
   const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 5); // Vandaag + Morgen alleen.
+  tomorrow.setDate(tomorrow.getDate() + 1); // Vandaag + Morgen alleen.
   const tomorrowStr = tomorrow.toISOString().split("T")[0];
 
   if (success) {
@@ -37,12 +36,6 @@ export default function ReservationPage() {
         <p className="text-gray-400 mb-8">Boek een PC of PS5. Let op de regels.</p>
 
         <form onSubmit={handleSubmit} className="bg-slate-900 border border-slate-800 p-8 rounded-3xl space-y-6 shadow-xl">
-          {error && (
-            <div className="bg-red-900/20 border border-red-500/50 text-red-200 p-4 rounded-xl flex items-center gap-3">
-              <AlertTriangle size={20} /> {error}
-            </div>
-          )}
-
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-bold text-gray-500 uppercase mb-1">S-Nummer</label>
@@ -207,6 +200,12 @@ export default function ReservationPage() {
               . Ik draag zorg voor het materiaal en laat de plek netjes achter. Bij schade wordt mijn studentenaccount belast.
             </label>
           </div>
+
+          {error && (
+            <div className="bg-red-900/20 border border-red-500/50 text-red-200 p-4 rounded-xl flex items-center gap-3">
+              <AlertTriangle size={20} /> {error}
+            </div>
+          )}
 
           <button type="submit" disabled={loading} className="w-full bg-white text-slate-950 font-black py-4 rounded-xl hover:bg-gray-200 transition-colors disabled:opacity-50">
             {loading ? "Bezig met controleren..." : "RESERVEER NU"}

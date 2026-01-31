@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { doc, setDoc, arrayUnion, onSnapshot, getDoc } from "firebase/firestore";
 import { db } from "../lib/firebase";
 import { DaySchedule, Reservation } from "../lib/types";
@@ -53,79 +53,87 @@ export function useReservation() {
     };
   }, []);
 
-  const calculateAvailableStartTimes = (date: string, duration: string, inventoryType: string, controllers: number, extraController: boolean) => {
-    if (!date) return [];
+  const calculateAvailableStartTimes = useCallback(
+    (date: string, duration: string, inventoryType: string, controllers: number, extraController: boolean) => {
+      if (!date) return [];
 
-    const dateObj = new Date(date);
-    const daysMap = ["Zondag", "Maandag", "Dinsdag", "Woensdag", "Donderdag", "Vrijdag", "Zaterdag"];
-    const dayName = daysMap[dateObj.getDay()];
-    const daySchedule = timetable.find((d) => d.day === dayName);
+      const dateObj = new Date(date);
+      const daysMap = ["Zondag", "Maandag", "Dinsdag", "Woensdag", "Donderdag", "Vrijdag", "Zaterdag"];
+      const dayName = daysMap[dateObj.getDay()];
+      const daySchedule = timetable.find((d) => d.day === dayName);
 
-    if (!daySchedule) return [];
+      if (!daySchedule) return [];
 
-    const availableTimes: string[] = [];
-    const requiredDuration = parseInt(duration);
+      const availableTimes: string[] = [];
+      const requiredDuration = parseInt(duration);
 
-    const now = new Date();
-    const isToday = date === now.toISOString().split("T")[0];
-    const currentTimeMins = now.getHours() * 60 + now.getMinutes();
+      const now = new Date();
+      const isToday = date === now.toISOString().split("T")[0];
+      const currentTimeMins = now.getHours() * 60 + now.getMinutes();
 
-    daySchedule.slots
-      .filter((s) => s.type === "open")
-      .forEach((slot) => {
-        let currentMins = timeToMins(slot.start);
-        const endMins = timeToMins(slot.end);
+      daySchedule.slots
+        .filter((s) => s.type === "open")
+        .forEach((slot) => {
+          let currentMins = timeToMins(slot.start);
+          const endMins = timeToMins(slot.end);
 
-        while (currentMins + requiredDuration <= endMins) {
-          if (isToday && currentMins <= currentTimeMins) {
+          while (currentMins + requiredDuration <= endMins) {
+            if (isToday && currentMins <= currentTimeMins) {
+              currentMins += 30;
+              continue;
+            }
+
+            const startStr = minsToTime(currentMins);
+            const endStr = minsToTime(currentMins + requiredDuration);
+
+            const hardwareCount = existingReservations.filter(
+              (r) => r.date === date && r.inventory === inventoryType && timeToMins(r.startTime) < timeToMins(endStr) && timeToMins(r.endTime) > currentMins,
+            ).length;
+
+            const maxHardware = inventory[inventoryType] || 0;
+
+            let controllersNeeded = 0;
+            let maxControllers = 0;
+            let controllersInUse = 0;
+
+            if (inventoryType === "switch") {
+              controllersNeeded = controllers;
+              maxControllers = inventory["Nintendo Controllers"] || 0;
+              controllersInUse = existingReservations
+                .filter((r) => r.date === date && r.inventory === "switch" && timeToMins(r.startTime) < timeToMins(endStr) && timeToMins(r.endTime) > currentMins)
+                .reduce((sum, r) => sum + (r.controllers || 0), 0);
+            } else {
+              controllersNeeded = inventoryType === "ps5" ? controllers : extraController ? 1 : 0;
+              maxControllers = inventory.controller || 0;
+              controllersInUse = existingReservations
+                .filter((r) => r.date === date && r.inventory !== "switch" && timeToMins(r.startTime) < timeToMins(endStr) && timeToMins(r.endTime) > currentMins)
+                .reduce((sum, r) => sum + (r.controllers || 0), 0);
+            }
+
+            if (hardwareCount < maxHardware && (controllersNeeded === 0 || controllersInUse + controllersNeeded <= maxControllers)) {
+              availableTimes.push(startStr);
+            }
+
             currentMins += 30;
-            continue;
           }
+        });
 
-          const startStr = minsToTime(currentMins);
-          const endStr = minsToTime(currentMins + requiredDuration);
+      return availableTimes;
+    },
+    [timetable, existingReservations, inventory],
+  );
 
-          const hardwareCount = existingReservations.filter(
-            (r) => r.date === date && r.inventory === inventoryType && timeToMins(r.startTime) < timeToMins(endStr) && timeToMins(r.endTime) > currentMins,
-          ).length;
+  const availableStartTimes = useMemo(() => {
+    return calculateAvailableStartTimes(formData.date, formData.duration || "60", formData.inventory, formData.controllers, formData.extraController);
+  }, [calculateAvailableStartTimes, formData.date, formData.duration, formData.inventory, formData.controllers, formData.extraController]);
 
-          const maxHardware = inventory[inventoryType] || 0;
-
-          let controllersNeeded = 0;
-          let maxControllers = 0;
-          let controllersInUse = 0;
-
-          if (inventoryType === "switch") {
-            controllersNeeded = controllers;
-            maxControllers = inventory["Nintendo Controllers"] || 0;
-            controllersInUse = existingReservations
-              .filter((r) => r.date === date && r.inventory === "switch" && timeToMins(r.startTime) < timeToMins(endStr) && timeToMins(r.endTime) > currentMins)
-              .reduce((sum, r) => sum + (r.controllers || 0), 0);
-          } else {
-            controllersNeeded = inventoryType === "ps5" ? controllers : extraController ? 1 : 0;
-            maxControllers = inventory.controller || 0;
-            controllersInUse = existingReservations
-              .filter((r) => r.date === date && r.inventory !== "switch" && timeToMins(r.startTime) < timeToMins(endStr) && timeToMins(r.endTime) > currentMins)
-              .reduce((sum, r) => sum + (r.controllers || 0), 0);
-          }
-
-          if (hardwareCount < maxHardware && (controllersNeeded === 0 || controllersInUse + controllersNeeded <= maxControllers)) {
-            availableTimes.push(startStr);
-          }
-
-          currentMins += 30;
-        }
-      });
-
-    return availableTimes;
-  };
-
-  const availableStartTimes = calculateAvailableStartTimes(formData.date, formData.duration || "60", formData.inventory, formData.controllers, formData.extraController);
-
-  const checkAvailability = (count: number) => {
-    if (!formData.date) return true;
-    return calculateAvailableStartTimes(formData.date, formData.duration || "60", formData.inventory, count, formData.extraController).length > 0;
-  };
+  const checkAvailability = useCallback(
+    (count: number) => {
+      if (!formData.date) return true;
+      return calculateAvailableStartTimes(formData.date, formData.duration || "60", formData.inventory, count, formData.extraController).length > 0;
+    },
+    [calculateAvailableStartTimes, formData.date, formData.duration, formData.inventory, formData.extraController],
+  );
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

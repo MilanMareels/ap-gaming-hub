@@ -236,12 +236,8 @@ export function useAdminData() {
               loggedAt: new Date().toISOString(),
             };
 
-            if (logsSnap.exists()) {
-              const currentLogs = logsSnap.data().noShows || [];
-              await updateDoc(logsRef, { noShows: [...currentLogs, logEntry] });
-            } else {
-              await setDoc(logsRef, { noShows: [logEntry] });
-            }
+            // Optimalisatie: Gebruik arrayUnion en setDoc met merge om een lees-actie te besparen
+            await setDoc(logsRef, { noShows: arrayUnion(logEntry) }, { merge: true });
           }
         }
       } else {
