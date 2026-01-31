@@ -236,7 +236,6 @@ export function useAdminData() {
               loggedAt: new Date().toISOString(),
             };
 
-            // Optimalisatie: Gebruik arrayUnion en setDoc met merge om een lees-actie te besparen
             await setDoc(logsRef, { noShows: arrayUnion(logEntry) }, { merge: true });
           }
         }
@@ -249,7 +248,7 @@ export function useAdminData() {
         }
       }
     } catch (error) {
-      console.error("Error updating status:", error);
+      console.error("Error:", error);
     }
   };
 
@@ -264,7 +263,7 @@ export function useAdminData() {
         await updateDoc(logsRef, { noShows: updatedNoShows });
       }
     } catch (error) {
-      console.error("Error resetting strikes:", error);
+      console.error("Error:", error);
     }
   };
 
