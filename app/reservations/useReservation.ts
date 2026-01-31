@@ -1,20 +1,7 @@
-import { useState, useEffect } from "react";
-import { doc, setDoc, arrayUnion, onSnapshot } from "firebase/firestore";
+import { useState, useEffect, useMemo, useCallback } from "react";
+import { doc, setDoc, arrayUnion, onSnapshot, getDoc } from "firebase/firestore";
 import { db } from "../lib/firebase";
-
-// Types
-export type Reservation = {
-  date: string;
-  startTime: string;
-  endTime: string;
-  inventory: string;
-  controllers?: number;
-};
-
-export type DaySchedule = {
-  day: string;
-  slots: { start: string; end: string; type: "open" | "team" | "closed" }[];
-};
+import { DaySchedule, Reservation } from "../lib/types";
 
 // Helpers
 const timeToMins = (t: string) => {
@@ -35,7 +22,7 @@ export function useReservation() {
 
   const [timetable, setTimetable] = useState<DaySchedule[]>([]);
   const [existingReservations, setExistingReservations] = useState<Reservation[]>([]);
-  const [inventory, setInventory] = useState<Record<string, number>>({ pc: 5, ps5: 1, switch: 1, controller: 8 });
+  const [inventory, setInventory] = useState<Record<string, number>>({ pc: 5, ps5: 1, switch: 1, controller: 8, "Nintendo Controllers": 4 });
 
   const [formData, setFormData] = useState({
     sNumber: "",
@@ -57,7 +44,7 @@ export function useReservation() {
       if (d.exists()) setTimetable(d.data().schedule || []);
     });
     const unsubSettings = onSnapshot(doc(db, "content", "settings"), (d) => {
-      if (d.exists()) setInventory(d.data().inventory || { pc: 5, ps5: 1, switch: 1, controller: 8 });
+      if (d.exists()) setInventory(d.data().inventory || { pc: 5, ps5: 1, switch: 1, controller: 8, "Nintendo Controllers": 4 });
     });
     return () => {
       unsubRes();
@@ -66,53 +53,87 @@ export function useReservation() {
     };
   }, []);
 
-  const getAvailableStartTimes = () => {
-    if (!formData.date) return [];
+  const calculateAvailableStartTimes = useCallback(
+    (date: string, duration: string, inventoryType: string, controllers: number, extraController: boolean) => {
+      if (!date) return [];
 
-    const dateObj = new Date(formData.date);
-    const daysMap = ["Zondag", "Maandag", "Dinsdag", "Woensdag", "Donderdag", "Vrijdag", "Zaterdag"];
-    const dayName = daysMap[dateObj.getDay()];
-    const daySchedule = timetable.find((d) => d.day === dayName);
+      const dateObj = new Date(date);
+      const daysMap = ["Zondag", "Maandag", "Dinsdag", "Woensdag", "Donderdag", "Vrijdag", "Zaterdag"];
+      const dayName = daysMap[dateObj.getDay()];
+      const daySchedule = timetable.find((d) => d.day === dayName);
 
-    if (!daySchedule) return [];
+      if (!daySchedule) return [];
 
-    const availableTimes: string[] = [];
-    const requiredDuration = parseInt(formData.duration);
+      const availableTimes: string[] = [];
+      const requiredDuration = parseInt(duration);
 
-    daySchedule.slots
-      .filter((s) => s.type === "open")
-      .forEach((slot) => {
-        let currentMins = timeToMins(slot.start);
-        const endMins = timeToMins(slot.end);
+      const now = new Date();
+      const isToday = date === now.toISOString().split("T")[0];
+      const currentTimeMins = now.getHours() * 60 + now.getMinutes();
 
-        while (currentMins + requiredDuration <= endMins) {
-          const startStr = minsToTime(currentMins);
-          const endStr = minsToTime(currentMins + requiredDuration);
+      daySchedule.slots
+        .filter((s) => s.type === "open")
+        .forEach((slot) => {
+          let currentMins = timeToMins(slot.start);
+          const endMins = timeToMins(slot.end);
 
-          const hardwareCount = existingReservations.filter(
-            (r) => r.date === formData.date && r.inventory === formData.inventory && timeToMins(r.startTime) < timeToMins(endStr) && timeToMins(r.endTime) > currentMins,
-          ).length;
+          while (currentMins + requiredDuration <= endMins) {
+            if (isToday && currentMins <= currentTimeMins) {
+              currentMins += 30;
+              continue;
+            }
 
-          const maxHardware = inventory[formData.inventory] || 0;
+            const startStr = minsToTime(currentMins);
+            const endStr = minsToTime(currentMins + requiredDuration);
 
-          let controllersNeeded = formData.inventory === "ps5" ? formData.controllers : formData.extraController ? 1 : 0;
+            const hardwareCount = existingReservations.filter(
+              (r) => r.date === date && r.inventory === inventoryType && timeToMins(r.startTime) < timeToMins(endStr) && timeToMins(r.endTime) > currentMins,
+            ).length;
 
-          const controllersInUse = existingReservations
-            .filter((r) => r.date === formData.date && timeToMins(r.startTime) < timeToMins(endStr) && timeToMins(r.endTime) > currentMins)
-            .reduce((sum, r) => sum + (r.controllers || 0), 0);
+            const maxHardware = inventory[inventoryType] || 0;
 
-          const maxControllers = inventory.controller || 0;
+            let controllersNeeded = 0;
+            let maxControllers = 0;
+            let controllersInUse = 0;
 
-          if (hardwareCount < maxHardware && (controllersNeeded === 0 || controllersInUse + controllersNeeded <= maxControllers)) {
-            availableTimes.push(startStr);
+            if (inventoryType === "switch") {
+              controllersNeeded = controllers;
+              maxControllers = inventory["Nintendo Controllers"] || 0;
+              controllersInUse = existingReservations
+                .filter((r) => r.date === date && r.inventory === "switch" && timeToMins(r.startTime) < timeToMins(endStr) && timeToMins(r.endTime) > currentMins)
+                .reduce((sum, r) => sum + (r.controllers || 0), 0);
+            } else {
+              controllersNeeded = inventoryType === "ps5" ? controllers : extraController ? 1 : 0;
+              maxControllers = inventory.controller || 0;
+              controllersInUse = existingReservations
+                .filter((r) => r.date === date && r.inventory !== "switch" && timeToMins(r.startTime) < timeToMins(endStr) && timeToMins(r.endTime) > currentMins)
+                .reduce((sum, r) => sum + (r.controllers || 0), 0);
+            }
+
+            if (hardwareCount < maxHardware && (controllersNeeded === 0 || controllersInUse + controllersNeeded <= maxControllers)) {
+              availableTimes.push(startStr);
+            }
+
+            currentMins += 30;
           }
+        });
 
-          currentMins += 30;
-        }
-      });
+      return availableTimes;
+    },
+    [timetable, existingReservations, inventory],
+  );
 
-    return availableTimes;
-  };
+  const availableStartTimes = useMemo(() => {
+    return calculateAvailableStartTimes(formData.date, formData.duration || "60", formData.inventory, formData.controllers, formData.extraController);
+  }, [calculateAvailableStartTimes, formData.date, formData.duration, formData.inventory, formData.controllers, formData.extraController]);
+
+  const checkAvailability = useCallback(
+    (count: number) => {
+      if (!formData.date) return true;
+      return calculateAvailableStartTimes(formData.date, formData.duration || "60", formData.inventory, count, formData.extraController).length > 0;
+    },
+    [calculateAvailableStartTimes, formData.date, formData.duration, formData.inventory, formData.extraController],
+  );
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -124,10 +145,52 @@ export function useReservation() {
       if (!formData.email.endsWith("@ap.be") && !formData.email.endsWith("@student.ap.be")) throw new Error("Gebruik je officiële AP email.");
       if (!formData.startTime) throw new Error("Selecteer een starttijd.");
 
+      const currentSNumber = formData.sNumber.trim().toLowerCase();
       const startMins = timeToMins(formData.startTime);
-      const endMins = startMins + parseInt(formData.duration);
+      const duration = parseInt(formData.duration || "60");
+      const endMins = startMins + duration;
       const endTime = minsToTime(endMins);
-      const controllersCount = formData.inventory === "ps5" ? formData.controllers : formData.extraController ? 1 : 0;
+      const controllersCount = formData.inventory === "ps5" || formData.inventory === "switch" ? formData.controllers : formData.extraController ? 1 : 0;
+
+      const logsRef = doc(db, "content", "logs");
+      const logsSnap = await getDoc(logsRef);
+      if (logsSnap.exists()) {
+        const logsData = logsSnap.data();
+        const userStrikes = (logsData.noShows || []).filter((log: any) => log.sNumber && log.sNumber.trim().toLowerCase() === currentSNumber);
+        if (userStrikes.length >= 3) {
+          throw new Error("Je account is geblokkeerd vanwege 3 no-shows. Contacteer een admin.");
+        }
+      }
+
+      let totalDuration = 0;
+      let hasOverlap = false;
+      let hasInsufficientGap = false;
+
+      existingReservations.forEach((r) => {
+        if (r.date !== formData.date || !["not-present", "booked", "present"].includes(r.status!)) return;
+
+        if (r.sNumber && r.sNumber.trim().toLowerCase() === currentSNumber) {
+          const rStart = timeToMins(r.startTime);
+          let rEnd;
+          if (r.endTime) {
+            rEnd = timeToMins(r.endTime);
+          } else {
+            rEnd = rStart + (parseInt((r as any).duration) || 60);
+          }
+
+          totalDuration += rEnd - rStart;
+
+          if (startMins < rEnd && endMins > rStart) {
+            hasOverlap = true;
+          } else if (startMins < rEnd + 30 && endMins > rStart - 30) {
+            hasInsufficientGap = true;
+          }
+        }
+      });
+
+      if (hasOverlap) throw new Error("Je hebt al een reservatie die overlapt met dit tijdslot.");
+      if (hasInsufficientGap) throw new Error("Er moet minstens 30 minuten tussen je reservaties zitten.");
+      if (totalDuration + duration > 240) throw new Error(`Je mag maximaal 4 uur per dag reserveren. Je hebt al ${totalDuration / 60} uur.`);
 
       const newReservation = {
         id: Date.now().toString(),
@@ -138,7 +201,7 @@ export function useReservation() {
         startTime: formData.startTime,
         endTime: endTime,
         controllers: controllersCount,
-        status: "active",
+        status: "booked",
         createdAt: new Date().toISOString(),
       };
 
@@ -157,7 +220,10 @@ export function useReservation() {
     error,
     formData,
     setFormData,
-    availableStartTimes: getAvailableStartTimes(),
+    availableStartTimes,
+    checkAvailability,
     handleSubmit,
+    inventory,
+    existingReservations,
   };
 }

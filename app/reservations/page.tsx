@@ -3,10 +3,13 @@ import { Calendar, Monitor, Gamepad2, CheckCircle, AlertTriangle, Users, Gamepad
 import { useReservation } from "./useReservation";
 
 export default function ReservationPage() {
-  const { loading, success, error, formData, setFormData, availableStartTimes, handleSubmit } = useReservation();
+  const { loading, success, error, formData, setFormData, availableStartTimes, handleSubmit, checkAvailability, inventory } = useReservation();
+
+  const today = new Date();
+  const todayStr = today.toISOString().split("T")[0];
 
   const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
+  tomorrow.setDate(tomorrow.getDate() + 1); // Vandaag + Morgen alleen.
   const tomorrowStr = tomorrow.toISOString().split("T")[0];
 
   if (success) {
@@ -33,12 +36,6 @@ export default function ReservationPage() {
         <p className="text-gray-400 mb-8">Boek een PC of PS5. Let op de regels.</p>
 
         <form onSubmit={handleSubmit} className="bg-slate-900 border border-slate-800 p-8 rounded-3xl space-y-6 shadow-xl">
-          {error && (
-            <div className="bg-red-900/20 border border-red-500/50 text-red-200 p-4 rounded-xl flex items-center gap-3">
-              <AlertTriangle size={20} /> {error}
-            </div>
-          )}
-
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-bold text-gray-500 uppercase mb-1">S-Nummer</label>
@@ -87,23 +84,37 @@ export default function ReservationPage() {
             </div>
           </div>
 
-          {formData.inventory === "ps5" && (
+          {(formData.inventory === "ps5" || formData.inventory === "switch") && (
             <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
               <label className="block text-xs font-bold text-gray-500 uppercase mb-2 items-center gap-2">
                 <Users size={14} /> Aantal Spelers (Controllers)
               </label>
               <div className="flex gap-2">
-                {[1, 2, 3, 4].map((n) => (
-                  <button
-                    key={n}
-                    type="button"
-                    onClick={() => setFormData({ ...formData, controllers: n, startTime: "" })}
-                    className={`flex-1 py-2 rounded-lg font-bold border ${formData.controllers === n ? "bg-blue-600 border-blue-500 text-white" : "bg-slate-900 border-slate-700 text-gray-400"}`}
-                  >
-                    {n}
-                  </button>
-                ))}
+                {Array.from({
+                  length: Math.min(4, formData.inventory === "switch" ? inventory["Nintendo Controllers"] || 0 : inventory.controller || 0),
+                }).map((_, i) => {
+                  const n = i + 1;
+                  const isAvailable = checkAvailability(n);
+                  return (
+                    <button
+                      key={n}
+                      type="button"
+                      disabled={!isAvailable}
+                      onClick={() => setFormData({ ...formData, controllers: n, startTime: "" })}
+                      className={`flex-1 py-2 rounded-lg font-bold border transition-all ${
+                        formData.controllers === n
+                          ? "bg-blue-600 border-blue-500 text-white"
+                          : isAvailable
+                            ? "bg-slate-900 border-slate-700 text-gray-400 hover:border-gray-600"
+                            : "bg-slate-900 border-slate-800 text-gray-600 cursor-not-allowed opacity-50"
+                      }`}
+                    >
+                      {n}
+                    </button>
+                  );
+                })}
               </div>
+              {formData.date && !checkAvailability(1) && <p className="text-xs text-red-500 mt-2">Geen controllers meer beschikbaar op deze datum.</p>}
             </div>
           )}
 
@@ -132,7 +143,7 @@ export default function ReservationPage() {
                 <input
                   required
                   type="date"
-                  min={tomorrowStr}
+                  min={todayStr}
                   max={tomorrowStr}
                   value={formData.date}
                   onChange={(e) => setFormData({ ...formData, date: e.target.value, startTime: "" })}
@@ -153,20 +164,20 @@ export default function ReservationPage() {
               </div>
               <div>
                 <label className="text-xs text-gray-500">Start Tijd</label>
-                <select
-                  required
-                  disabled={!formData.date}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 mt-1 text-white disabled:opacity-50"
-                  value={formData.startTime}
-                  onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
-                >
-                  <option value="">Kies tijd...</option>
+                <div className="grid grid-cols-3 gap-2 mt-1">
                   {availableStartTimes.map((t) => (
-                    <option key={t} value={t}>
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={() => setFormData({ ...formData, startTime: t })}
+                      className={`py-2 rounded-lg text-sm font-bold border transition-all ${
+                        formData.startTime === t ? "bg-red-600 border-red-500 text-white" : "bg-slate-900 border-slate-700 text-gray-400 hover:border-gray-600"
+                      }`}
+                    >
                       {t}
-                    </option>
+                    </button>
                   ))}
-                </select>
+                </div>
               </div>
             </div>
             {formData.date && availableStartTimes.length === 0 && <p className="text-xs text-red-400 mt-2">Geen beschikbare sloten voor deze selectie.</p>}
@@ -190,8 +201,14 @@ export default function ReservationPage() {
             </label>
           </div>
 
+          {error && (
+            <div className="bg-red-900/20 border border-red-500/50 text-red-200 p-4 rounded-xl flex items-center gap-3">
+              <AlertTriangle size={20} /> {error}
+            </div>
+          )}
+
           <button type="submit" disabled={loading} className="w-full bg-white text-slate-950 font-black py-4 rounded-xl hover:bg-gray-200 transition-colors disabled:opacity-50">
-            {loading ? "Bezig met boeken..." : "RESERVEER NU"}
+            {loading ? "Bezig met controleren..." : "RESERVEER NU"}
           </button>
         </form>
       </div>
