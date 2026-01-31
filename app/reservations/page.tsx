@@ -10,7 +10,7 @@ export default function ReservationPage() {
   const todayStr = today.toISOString().split("T")[0];
 
   const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1); // Vandaag + Morgen alleen.
+  tomorrow.setDate(tomorrow.getDate() + 5); // Vandaag + Morgen alleen.
   const tomorrowStr = tomorrow.toISOString().split("T")[0];
 
   const [localError, setLocalError] = useState("");
@@ -25,6 +25,7 @@ export default function ReservationPage() {
       if (formData.sNumber && formData.date && formData.startTime) {
         let totalDuration = 0;
         let hasOverlap = false;
+        let hasInsufficientGap = false;
 
         const newStartParts = formData.startTime.split(":").map(Number);
         const newStartMin = newStartParts[0] * 60 + newStartParts[1];
@@ -51,6 +52,8 @@ export default function ReservationPage() {
 
             if (newStartMin < endMin && newEndMin > startMin) {
               hasOverlap = true;
+            } else if (newStartMin < endMin + 30 && newEndMin > startMin - 30) {
+              hasInsufficientGap = true;
             }
           }
         });
@@ -61,8 +64,14 @@ export default function ReservationPage() {
           return;
         }
 
-        if (totalDuration + newDuration > 120) {
-          setLocalError(`Je mag maximaal 2 uur per dag reserveren. Je hebt al ${totalDuration / 60} uur gereserveerd.`);
+        if (hasInsufficientGap) {
+          setLocalError("Er moet minstens 30 minuten tussen je reservaties zitten.");
+          setChecking(false);
+          return;
+        }
+
+        if (totalDuration + newDuration > 240) {
+          setLocalError(`Je mag maximaal 4 uur per dag reserveren. Je hebt al ${totalDuration / 60} uur gereserveerd.`);
           setChecking(false);
           return;
         }

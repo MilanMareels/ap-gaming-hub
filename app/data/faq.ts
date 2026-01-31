@@ -17,6 +17,6 @@ export const faqs = [
   },
   {
     question: "Hoelang mag ik huren en blijven gamen?",
-    answer: "Je kan maximaal 2 uur per dag reserveren. Dit limiet zorgt ervoor dat zoveel mogelijk studenten gebruik kunnen maken van de faciliteiten.",
+    answer: "Je kan maximaal 4 uur per dag reserveren. Dit limiet zorgt ervoor dat zoveel mogelijk studenten gebruik kunnen maken van de faciliteiten.",
   },
 ];
