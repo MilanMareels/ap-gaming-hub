@@ -1,25 +1,14 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { signOut } from "firebase/auth";
-import { auth, db } from "../lib/firebase";
-import { doc, getDoc, updateDoc, setDoc, onSnapshot } from "firebase/firestore";
+import { auth } from "../lib/firebase";
 import { LogOut, Loader2, Plus, Trash2, Save, Check, Ban, X, Clock, Gamepad2, UserCheck, UserX, AlertOctagon, ShieldCheck } from "lucide-react";
 import { LoginScreen } from "./LoginScreen";
 import { useAdminData } from "./useAdminData";
 
 export default function AdminPage() {
   const [activeTab, setActiveTab] = useState("timetable");
-  const [noShows, setNoShows] = useState<any[]>([]);
-
-  useEffect(() => {
-    const unsub = onSnapshot(doc(db, "content", "logs"), (docSnap) => {
-      if (docSnap.exists()) {
-        setNoShows(docSnap.data().noShows || []);
-      }
-    });
-    return () => unsub();
-  }, []);
 
   const {
     user,
@@ -29,6 +18,11 @@ export default function AdminPage() {
     filteredReservations,
     reservationFilterDate,
     setReservationFilterDate,
+    reservationSearchQuery,
+    setReservationSearchQuery,
+    noShowSearchQuery,
+    setNoShowSearchQuery,
+    filteredNoShows,
     highscores,
     rosters,
     timetable,
@@ -53,6 +47,8 @@ export default function AdminPage() {
     handleAddPlayer,
     handleDeletePlayer,
     handleDeleteReservation,
+    handleStatusUpdate,
+    handleResetStrikes,
     handleApproveScore,
     handleDeleteScore,
     updateSettings,
@@ -62,68 +58,6 @@ export default function AdminPage() {
     addListItem,
     removeListItem,
   } = useAdminData();
-
-  const handleStatusUpdate = async (reservationId: string, newStatus: string) => {
-    try {
-      const resRef = doc(db, "content", "reservations");
-
-      if (newStatus === "not-present") {
-        const resSnap = await getDoc(resRef);
-        if (resSnap.exists()) {
-          const data = resSnap.data();
-          const reservation = data.reservations.find((r: any) => r.id === reservationId);
-
-          if (reservation) {
-            // 1. Verwijder uit actieve reservaties (maakt slot vrij)
-            const updatedReservations = data.reservations.filter((r: any) => r.id !== reservationId);
-            await updateDoc(resRef, { reservations: updatedReservations });
-
-            // 2. Voeg toe aan logs (No-Shows)
-            const logsRef = doc(db, "content", "logs");
-            const logsSnap = await getDoc(logsRef);
-            const logEntry = {
-              ...reservation,
-              status: "not-present",
-              loggedAt: new Date().toISOString(),
-            };
-
-            if (logsSnap.exists()) {
-              const currentLogs = logsSnap.data().noShows || [];
-              await updateDoc(logsRef, { noShows: [...currentLogs, logEntry] });
-            } else {
-              await setDoc(logsRef, { noShows: [logEntry] });
-            }
-          }
-        }
-      } else {
-        const docSnap = await getDoc(resRef);
-        if (docSnap.exists()) {
-          const data = docSnap.data();
-          const updatedReservations = data.reservations.map((r: any) => (r.id === reservationId ? { ...r, status: newStatus } : r));
-          await updateDoc(resRef, { reservations: updatedReservations });
-        }
-      }
-    } catch (error) {
-      console.error("Error updating status:", error);
-    }
-  };
-
-  const handleResetStrikes = async (sNumber: string) => {
-    if (!confirm(`Weet je zeker dat je de strikes voor ${sNumber} wilt resetten? Dit deblokkeert de student.`)) return;
-
-    try {
-      const logsRef = doc(db, "content", "logs");
-      const logsSnap = await getDoc(logsRef);
-
-      if (logsSnap.exists()) {
-        const currentNoShows = logsSnap.data().noShows || [];
-        const updatedNoShows = currentNoShows.filter((log: any) => log.sNumber !== sNumber);
-        await updateDoc(logsRef, { noShows: updatedNoShows });
-      }
-    } catch (error) {
-      console.error("Error resetting strikes:", error);
-    }
-  };
 
   if (loading)
     return (
@@ -178,6 +112,13 @@ export default function AdminPage() {
                 className="bg-slate-900 border border-slate-700 rounded p-2 text-white text-sm [&::-webkit-calendar-picker-indicator]:invert"
                 value={reservationFilterDate}
                 onChange={(e) => setReservationFilterDate(e.target.value)}
+              />
+              <input
+                type="text"
+                placeholder="Zoek op Email of S nummer"
+                className="bg-slate-900 border border-slate-700 rounded p-2 text-white text-sm w-64"
+                value={reservationSearchQuery}
+                onChange={(e) => setReservationSearchQuery(e.target.value)}
               />
               {reservationFilterDate && (
                 <button onClick={() => setReservationFilterDate("")} className="text-xs text-red-500 hover:underline">
@@ -350,6 +291,15 @@ export default function AdminPage() {
                 <AlertOctagon className="text-red-500" /> No-Show Logboek
               </h3>
               <p className="text-gray-400 text-sm mt-1">Lijst van studenten die niet zijn komen opdagen. Gebruik dit voor strikes.</p>
+              <div className="mt-4">
+                <input
+                  type="text"
+                  placeholder="Zoek op Email of S nummer"
+                  className="bg-slate-950 border border-slate-700 rounded p-2 text-white text-sm w-full md:w-64"
+                  value={noShowSearchQuery}
+                  onChange={(e) => setNoShowSearchQuery(e.target.value)}
+                />
+              </div>
             </div>
             <table className="w-full text-left text-sm">
               <thead className="bg-slate-950 text-gray-500 uppercase">
@@ -362,7 +312,7 @@ export default function AdminPage() {
               </thead>
               <tbody className="divide-y divide-slate-800">
                 {Object.values(
-                  noShows.reduce((acc: any, curr: any) => {
+                  filteredNoShows.reduce((acc: any, curr: any) => {
                     const key = curr.sNumber;
                     if (!acc[key]) acc[key] = { ...curr, count: 0, history: [] };
                     acc[key].count++;
@@ -388,7 +338,7 @@ export default function AdminPage() {
                       </td>
                     </tr>
                   ))}
-                {noShows.length === 0 && (
+                {filteredNoShows.length === 0 && (
                   <tr>
                     <td colSpan={4} className="p-8 text-center text-gray-500">
                       Geen no-shows geregistreerd.

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { onAuthStateChanged, User } from "firebase/auth";
-import { doc, updateDoc, onSnapshot, setDoc, arrayUnion, arrayRemove } from "firebase/firestore";
+import { doc, updateDoc, onSnapshot, setDoc, arrayUnion, arrayRemove, getDoc } from "firebase/firestore";
 import { auth, db } from "../lib/firebase";
 import { EventItem, Reservation, Highscore, RosterData, DaySchedule } from "../lib/types";
 
@@ -22,6 +22,7 @@ export function useAdminData() {
   const [highscores, setHighscores] = useState<Highscore[]>([]);
   const [rosters, setRosters] = useState<RosterData>({});
   const [timetable, setTimetable] = useState<DaySchedule[]>(DEFAULT_WEEK);
+  const [noShows, setNoShows] = useState<any[]>([]);
 
   // Inputs
   const [settings, setSettings] = useState({ googleFormUrl: "" });
@@ -29,6 +30,8 @@ export function useAdminData() {
   const [inventory, setInventory] = useState<Record<string, number>>({ pc: 5, ps5: 1, switch: 1, controller: 8 });
   const [newInventoryItem, setNewInventoryItem] = useState({ name: "", count: 0 });
   const [reservationFilterDate, setReservationFilterDate] = useState("");
+  const [reservationSearchQuery, setReservationSearchQuery] = useState("");
+  const [noShowSearchQuery, setNoShowSearchQuery] = useState("");
 
   const [newEvent, setNewEvent] = useState({ title: "", date: "", time: "", endTime: "", type: "Casual" });
   const [newPlayer, setNewPlayer] = useState({ name: "", handle: "", role: "", rank: "" });
@@ -94,6 +97,10 @@ export function useAdminData() {
       }
     });
 
+    const unsubLogs = onSnapshot(doc(db, "content", "logs"), (d) => {
+      if (d.exists()) setNoShows(d.data().noShows || []);
+    });
+
     return () => {
       unsubEv();
       unsubRes();
@@ -101,6 +108,7 @@ export function useAdminData() {
       unsubRosters();
       unsubTime();
       unsubSet();
+      unsubLogs();
     };
   }, [user]);
 
@@ -206,6 +214,64 @@ export function useAdminData() {
     }
   };
 
+  const handleStatusUpdate = async (reservationId: string, newStatus: string) => {
+    try {
+      const resRef = doc(db, "content", "reservations");
+
+      if (newStatus === "not-present") {
+        const resSnap = await getDoc(resRef);
+        if (resSnap.exists()) {
+          const data = resSnap.data();
+          const reservation = data.reservations.find((r: any) => r.id === reservationId);
+
+          if (reservation) {
+            const updatedReservations = data.reservations.filter((r: any) => r.id !== reservationId);
+            await updateDoc(resRef, { reservations: updatedReservations });
+
+            const logsRef = doc(db, "content", "logs");
+            const logsSnap = await getDoc(logsRef);
+            const logEntry = {
+              ...reservation,
+              status: "not-present",
+              loggedAt: new Date().toISOString(),
+            };
+
+            if (logsSnap.exists()) {
+              const currentLogs = logsSnap.data().noShows || [];
+              await updateDoc(logsRef, { noShows: [...currentLogs, logEntry] });
+            } else {
+              await setDoc(logsRef, { noShows: [logEntry] });
+            }
+          }
+        }
+      } else {
+        const docSnap = await getDoc(resRef);
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          const updatedReservations = data.reservations.map((r: any) => (r.id === reservationId ? { ...r, status: newStatus } : r));
+          await updateDoc(resRef, { reservations: updatedReservations });
+        }
+      }
+    } catch (error) {
+      console.error("Error updating status:", error);
+    }
+  };
+
+  const handleResetStrikes = async (sNumber: string) => {
+    if (!confirm(`Weet je zeker dat je de strikes voor ${sNumber} wilt resetten? Dit deblokkeert de student.`)) return;
+    try {
+      const logsRef = doc(db, "content", "logs");
+      const logsSnap = await getDoc(logsRef);
+      if (logsSnap.exists()) {
+        const currentNoShows = logsSnap.data().noShows || [];
+        const updatedNoShows = currentNoShows.filter((log: any) => log.sNumber !== sNumber);
+        await updateDoc(logsRef, { noShows: updatedNoShows });
+      }
+    } catch (error) {
+      console.error("Error resetting strikes:", error);
+    }
+  };
+
   const handleApproveScore = async (score: Highscore) => {
     const newList = highscores.map((s) => (s.id === score.id ? { ...s, status: "approved" } : s));
     await setDoc(doc(db, "content", "highscores"), { highscores: newList }, { merge: true });
@@ -260,7 +326,17 @@ export function useAdminData() {
     setLists({ ...lists, [type]: l });
   };
 
-  const filteredReservations = reservationFilterDate ? reservations.filter((r) => r.date === reservationFilterDate) : reservations;
+  const filteredReservations = reservations.filter((r) => {
+    const matchesDate = reservationFilterDate ? r.date === reservationFilterDate : true;
+    const searchLower = reservationSearchQuery.toLowerCase();
+    const matchesSearch = reservationSearchQuery ? (r.sNumber && r.sNumber.toLowerCase().includes(searchLower)) || (r.email && r.email.toLowerCase().includes(searchLower)) : true;
+    return matchesDate && matchesSearch;
+  });
+
+  const filteredNoShows = noShows.filter((log) => {
+    const searchLower = noShowSearchQuery.toLowerCase();
+    return noShowSearchQuery ? (log.sNumber && log.sNumber.toLowerCase().includes(searchLower)) || (log.email && log.email.toLowerCase().includes(searchLower)) : true;
+  });
 
   return {
     user,
@@ -271,9 +347,15 @@ export function useAdminData() {
     filteredReservations,
     reservationFilterDate,
     setReservationFilterDate,
+    reservationSearchQuery,
+    setReservationSearchQuery,
+    noShowSearchQuery,
+    setNoShowSearchQuery,
+    filteredNoShows,
     highscores,
     rosters,
     timetable,
+    noShows,
     setTimetable,
     settings,
     setSettings,
@@ -295,6 +377,8 @@ export function useAdminData() {
     handleAddPlayer,
     handleDeletePlayer,
     handleDeleteReservation,
+    handleStatusUpdate,
+    handleResetStrikes,
     handleApproveScore,
     handleDeleteScore,
     updateSettings,

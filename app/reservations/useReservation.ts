@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { doc, setDoc, arrayUnion, onSnapshot } from "firebase/firestore";
+import { doc, setDoc, arrayUnion, onSnapshot, getDoc } from "firebase/firestore";
 import { db } from "../lib/firebase";
 import { DaySchedule, Reservation } from "../lib/types";
 
@@ -133,15 +133,65 @@ export function useReservation() {
     setLoading(true);
 
     try {
+      // 1. Basis Validatie
       if (!formData.sNumber.toLowerCase().startsWith("s")) throw new Error("Gebruik een geldig s-nummer.");
       if (!formData.email.endsWith("@ap.be") && !formData.email.endsWith("@student.ap.be")) throw new Error("Gebruik je officiële AP email.");
       if (!formData.startTime) throw new Error("Selecteer een starttijd.");
 
+      const currentSNumber = formData.sNumber.trim().toLowerCase();
       const startMins = timeToMins(formData.startTime);
-      const endMins = startMins + parseInt(formData.duration || "60");
+      const duration = parseInt(formData.duration || "60");
+      const endMins = startMins + duration;
       const endTime = minsToTime(endMins);
       const controllersCount = formData.inventory === "ps5" || formData.inventory === "switch" ? formData.controllers : formData.extraController ? 1 : 0;
 
+      // 2. Check op Strikes (No-Shows)
+      const logsRef = doc(db, "content", "logs");
+      const logsSnap = await getDoc(logsRef);
+      if (logsSnap.exists()) {
+        const logsData = logsSnap.data();
+        const userStrikes = (logsData.noShows || []).filter((log: any) => log.sNumber && log.sNumber.trim().toLowerCase() === currentSNumber);
+        if (userStrikes.length >= 3) {
+          throw new Error("Je account is geblokkeerd vanwege 3 no-shows. Contacteer een admin.");
+        }
+      }
+
+      // 3. Check Overlap & Daglimiet & 30min Gap
+      let totalDuration = 0;
+      let hasOverlap = false;
+      let hasInsufficientGap = false;
+
+      existingReservations.forEach((r) => {
+        // Alleen checken voor dezelfde datum en actieve status
+        if (r.date !== formData.date || !["not-present", "booked", "present"].includes(r.status!)) return;
+
+        if (r.sNumber && r.sNumber.trim().toLowerCase() === currentSNumber) {
+          const rStart = timeToMins(r.startTime);
+          let rEnd;
+          if (r.endTime) {
+            rEnd = timeToMins(r.endTime);
+          } else {
+            rEnd = rStart + (parseInt((r as any).duration) || 60);
+          }
+
+          totalDuration += rEnd - rStart;
+
+          // Overlap logica
+          if (startMins < rEnd && endMins > rStart) {
+            hasOverlap = true;
+          }
+          // Gap logica (30 min buffer)
+          else if (startMins < rEnd + 30 && endMins > rStart - 30) {
+            hasInsufficientGap = true;
+          }
+        }
+      });
+
+      if (hasOverlap) throw new Error("Je hebt al een reservatie die overlapt met dit tijdslot.");
+      if (hasInsufficientGap) throw new Error("Er moet minstens 30 minuten tussen je reservaties zitten.");
+      if (totalDuration + duration > 240) throw new Error(`Je mag maximaal 4 uur per dag reserveren. Je hebt al ${totalDuration / 60} uur.`);
+
+      // 4. Opslaan
       const newReservation = {
         id: Date.now().toString(),
         sNumber: formData.sNumber,
