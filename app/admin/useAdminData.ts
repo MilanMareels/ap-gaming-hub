@@ -1,8 +1,22 @@
 import { useState, useEffect } from "react";
 import { onAuthStateChanged, User } from "firebase/auth";
-import { doc, updateDoc, onSnapshot, setDoc, arrayUnion, arrayRemove, getDoc } from "firebase/firestore";
+import { doc, onSnapshot } from "firebase/firestore";
 import { auth, db } from "../lib/firebase";
 import { EventItem, Reservation, Highscore, RosterData, DaySchedule } from "../lib/types";
+import {
+  addEventAction,
+  deleteEventAction,
+  addPlayerAction,
+  deletePlayerAction,
+  deleteReservationAction,
+  updateReservationStatusAction,
+  resetStrikesAction,
+  approveScoreAction,
+  deleteScoreAction,
+  updateSettingsAction,
+  updateInventoryAction,
+  saveTimetableAction,
+} from "../actions/adminActions";
 
 const DEFAULT_WEEK = [
   { day: "Maandag", slots: [] },
@@ -125,40 +139,13 @@ export function useAdminData() {
           type: newEvent.type,
         };
 
-        await setDoc(
-          doc(db, "content", "events"),
-          {
-            events: arrayUnion(eventData),
-          },
-          { merge: true },
-        );
-
-        const daysMap = ["Zondag", "Maandag", "Dinsdag", "Woensdag", "Donderdag", "Vrijdag", "Zaterdag"];
-        const dateObj = new Date(newEvent.date);
-        const dayName = daysMap[dateObj.getDay()];
-
-        const updatedTimetable = [...timetable];
-        const dayIndex = updatedTimetable.findIndex((d) => d.day === dayName);
-
-        if (dayIndex !== -1) {
-          updatedTimetable[dayIndex].slots.push({
-            start: newEvent.time,
-            end: newEvent.endTime,
-            label: `EVENT: ${newEvent.title}`,
-            type: "team",
-          });
-
-          updatedTimetable[dayIndex].slots.sort((a, b) => a.start.localeCompare(b.start));
-
-          setTimetable(updatedTimetable);
-          await setDoc(doc(db, "content", "timetable"), { schedule: updatedTimetable });
-        }
+        const result = await addEventAction(eventData);
+        if (!result.success) throw new Error(result.error);
 
         setNewEvent({ title: "", date: "", time: "", endTime: "", type: "Casual" });
         alert("Event toegevoegd aan lijst én weekplanning!");
       } catch (error) {
-        console.error("Error:", error);
-        alert("Fout bij opslaan.");
+        alert("Fout bij opslaan: " + error);
       }
     } else {
       alert("Vul aub alle velden in (Titel, Datum, Start- & Eindtijd, Type).");
@@ -167,122 +154,61 @@ export function useAdminData() {
 
   const handleDeleteEvent = async (eventItem: EventItem) => {
     if (confirm("Event verwijderen?")) {
-      await updateDoc(doc(db, "content", "events"), {
-        events: arrayRemove(eventItem),
-      });
-
-      const daysMap = ["Zondag", "Maandag", "Dinsdag", "Woensdag", "Donderdag", "Vrijdag", "Zaterdag"];
-      const dateObj = new Date(eventItem.date);
-      const dayName = daysMap[dateObj.getDay()];
-      const [startTime, endTime] = eventItem.time.split(" - ");
-
-      let changed = false;
-      const updatedTimetable = timetable.map((day) => {
-        if (day.day === dayName) {
-          const newSlots = day.slots.filter((slot) => !(slot.label === `EVENT: ${eventItem.title}` && slot.start === startTime && slot.end === endTime));
-          if (newSlots.length !== day.slots.length) changed = true;
-          return { ...day, slots: newSlots };
-        }
-        return day;
-      });
-
-      if (changed) {
-        setTimetable(updatedTimetable);
-        await setDoc(doc(db, "content", "timetable"), { schedule: updatedTimetable });
-      }
+      const result = await deleteEventAction(eventItem);
+      if (!result.success) alert("Fout bij verwijderen: " + result.error);
     }
   };
 
   const handleAddPlayer = async () => {
     if (newPlayer.handle && rosterGame) {
-      const list = rosters[rosterGame] || [];
-      await setDoc(doc(db, "content", "rosters"), { data: { ...rosters, [rosterGame]: [...list, newPlayer] } });
-      setNewPlayer({ name: "", handle: "", role: "", rank: "" });
+      const result = await addPlayerAction(rosterGame, newPlayer);
+      if (result.success) {
+        setNewPlayer({ name: "", handle: "", role: "", rank: "" });
+      } else {
+        alert("Fout: " + result.error);
+      }
     }
   };
 
   const handleDeletePlayer = async (idx: number) => {
-    const list = rosters[rosterGame].filter((_, i) => i !== idx);
-    await setDoc(doc(db, "content", "rosters"), { data: { ...rosters, [rosterGame]: list } });
+    const result = await deletePlayerAction(rosterGame, idx);
+    if (!result.success) alert("Fout: " + result.error);
   };
 
   const handleDeleteReservation = async (resItem: Reservation) => {
     if (confirm("Reservatie verwijderen?")) {
-      await updateDoc(doc(db, "content", "reservations"), {
-        reservations: arrayRemove(resItem),
-      });
+      const result = await deleteReservationAction(resItem);
+      if (!result.success) alert("Fout: " + result.error);
     }
   };
 
   const handleStatusUpdate = async (reservationId: string, newStatus: string) => {
-    try {
-      const resRef = doc(db, "content", "reservations");
-
-      if (newStatus === "not-present") {
-        const resSnap = await getDoc(resRef);
-        if (resSnap.exists()) {
-          const data = resSnap.data();
-          const reservation = data.reservations.find((r: any) => r.id === reservationId);
-
-          if (reservation) {
-            const updatedReservations = data.reservations.filter((r: any) => r.id !== reservationId);
-            await updateDoc(resRef, { reservations: updatedReservations });
-
-            const logsRef = doc(db, "content", "logs");
-            const logsSnap = await getDoc(logsRef);
-            const logEntry = {
-              ...reservation,
-              status: "not-present",
-              loggedAt: new Date().toISOString(),
-            };
-
-            await setDoc(logsRef, { noShows: arrayUnion(logEntry) }, { merge: true });
-          }
-        }
-      } else {
-        const docSnap = await getDoc(resRef);
-        if (docSnap.exists()) {
-          const data = docSnap.data();
-          const updatedReservations = data.reservations.map((r: any) => (r.id === reservationId ? { ...r, status: newStatus } : r));
-          await updateDoc(resRef, { reservations: updatedReservations });
-        }
-      }
-    } catch (error) {
-      console.error("Error:", error);
-    }
+    const result = await updateReservationStatusAction(reservationId, newStatus);
+    if (!result.success) alert("Fout: " + result.error);
   };
 
   const handleResetStrikes = async (sNumber: string) => {
     if (!confirm(`Weet je zeker dat je de strikes voor ${sNumber} wilt resetten? Dit deblokkeert de student.`)) return;
-    try {
-      const logsRef = doc(db, "content", "logs");
-      const logsSnap = await getDoc(logsRef);
-      if (logsSnap.exists()) {
-        const currentNoShows = logsSnap.data().noShows || [];
-        const updatedNoShows = currentNoShows.filter((log: any) => log.sNumber !== sNumber);
-        await updateDoc(logsRef, { noShows: updatedNoShows });
-      }
-    } catch (error) {
-      console.error("Error:", error);
-    }
+    const result = await resetStrikesAction(sNumber);
+    if (!result.success) alert("Fout: " + result.error);
   };
 
   const handleApproveScore = async (score: Highscore) => {
-    const newList = highscores.map((s) => (s.id === score.id ? { ...s, status: "approved" } : s));
-    await setDoc(doc(db, "content", "highscores"), { highscores: newList }, { merge: true });
+    const result = await approveScoreAction(score.id);
+    if (!result.success) alert("Fout: " + result.error);
   };
 
   const handleDeleteScore = async (score: Highscore) => {
     if (confirm("Score verwijderen?")) {
-      await updateDoc(doc(db, "content", "highscores"), {
-        highscores: arrayRemove(score),
-      });
+      const result = await deleteScoreAction(score);
+      if (!result.success) alert("Fout: " + result.error);
     }
   };
 
   const updateSettings = async () => {
-    await setDoc(doc(db, "content", "settings"), { settings, lists, inventory }, { merge: true });
-    alert("Instellingen opgeslagen!");
+    const result = await updateSettingsAction(settings, lists, inventory);
+    if (result.success) alert("Instellingen opgeslagen!");
+    else alert("Fout: " + result.error);
   };
 
   const handleAddInventoryItem = () => {
@@ -297,16 +223,17 @@ export function useAdminData() {
       const newInv = { ...inventory };
       delete newInv[key];
       setInventory(newInv);
-      await updateDoc(doc(db, "content", "settings"), { inventory: newInv });
+      const result = await updateInventoryAction(newInv);
+      if (!result.success) alert("Fout bij opslaan inventory: " + result.error);
     }
   };
 
   const saveTimetable = async () => {
-    try {
-      await setDoc(doc(db, "content", "timetable"), { schedule: timetable });
+    const result = await saveTimetableAction(timetable);
+    if (result.success) {
       alert("Uurrooster succesvol opgeslagen!");
-    } catch (error) {
-      alert("Fout bij opslaan: " + error);
+    } else {
+      alert("Fout bij opslaan: " + result.error);
     }
   };
 
