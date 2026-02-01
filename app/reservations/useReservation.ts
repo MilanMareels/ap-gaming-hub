@@ -141,8 +141,8 @@ export function useReservation() {
     setLoading(true);
 
     try {
-      if (!formData.sNumber.toLowerCase().startsWith("s")) throw new Error("Gebruik een geldig s-nummer.");
-      if (!formData.email.endsWith("@ap.be") && !formData.email.endsWith("@student.ap.be")) throw new Error("Gebruik je officiële AP email.");
+      if (!/^s[0-9]+$/.test(formData.sNumber.toLowerCase())) throw new Error("Gebruik een geldig s-nummer (s + cijfers).");
+      if (!formData.email.endsWith("@student.ap.be")) throw new Error("Gebruik je officiële AP email.");
       if (!formData.startTime) throw new Error("Selecteer een starttijd.");
 
       const currentSNumber = formData.sNumber.trim().toLowerCase();

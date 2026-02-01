@@ -50,7 +50,12 @@ export default function ReservationPage() {
                 type="text"
                 placeholder="s123456"
                 value={formData.sNumber}
-                onChange={(e) => setFormData({ ...formData, sNumber: e.target.value })}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (val === "" || /^[sS][0-9]*$/.test(val)) {
+                    setFormData({ ...formData, sNumber: val.toLowerCase() });
+                  }
+                }}
                 className="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 outline-none focus:border-red-500"
               />
             </div>
