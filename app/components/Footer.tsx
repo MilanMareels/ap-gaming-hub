@@ -13,12 +13,6 @@ const Footer = () => {
             Privacybeleid
           </Link>
         </p>
-        <p className="text-gray-600 text-sm">
-          Ontwikkeld door{" "}
-          <a href="https://milanmareels.be" target="_blank" rel="noopener noreferrer" className="text-red-600 hover:text-red-500 transition-colors font-bold">
-            Milan Mareels
-          </a>
-        </p>
       </div>
     </footer>
   );
