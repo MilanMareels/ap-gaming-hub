@@ -6,11 +6,17 @@ export default function ReservationPage() {
   const { loading, success, error, formData, setFormData, availableStartTimes, handleSubmit, checkAvailability, inventory } = useReservation();
 
   const today = new Date();
-  const todayStr = today.toISOString().split("T")[0];
+  const getLocalDateString = (date: Date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  };
+  const todayStr = getLocalDateString(today);
 
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1); // Vandaag + Morgen alleen.
-  const tomorrowStr = tomorrow.toISOString().split("T")[0];
+  const tomorrowStr = getLocalDateString(tomorrow);
 
   if (success) {
     return (
@@ -35,7 +41,7 @@ export default function ReservationPage() {
         </h1>
         <p className="text-gray-400 mb-8">Boek een PC of PS5. Let op de regels.</p>
 
-        <form onSubmit={handleSubmit} className="bg-slate-900 border border-slate-800 p-8 rounded-3xl space-y-6 shadow-xl">
+        <form onSubmit={handleSubmit} className="bg-slate-900 border border-slate-800 p-4 md:p-8 rounded-3xl space-y-6 shadow-xl">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-bold text-gray-500 uppercase mb-1">S-Nummer</label>
@@ -138,7 +144,7 @@ export default function ReservationPage() {
               <Calendar size={18} /> Planning
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
+              <div className="min-w-0">
                 <label className="text-xs text-gray-500">Datum</label>
                 <input
                   required
@@ -146,8 +152,14 @@ export default function ReservationPage() {
                   min={todayStr}
                   max={tomorrowStr}
                   value={formData.date}
-                  onChange={(e) => setFormData({ ...formData, date: e.target.value, startTime: "" })}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 mt-1"
+                  onChange={(e) => {
+                    let val = e.target.value;
+                    if (val > tomorrowStr) val = tomorrowStr;
+                    if (val < todayStr && val !== "") val = todayStr;
+                    setFormData({ ...formData, date: val, startTime: "" });
+                  }}
+                  className="w-90 max-w-full bg-slate-900 border border-slate-700 rounded-lg p-2 mt-1 text-white"
+                  style={{ colorScheme: "dark" }}
                 />
               </div>
               <div>
