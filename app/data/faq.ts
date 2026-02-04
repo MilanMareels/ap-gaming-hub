@@ -9,7 +9,7 @@ export const faqs = [
   },
   {
     question: "Welke PC's zijn er?",
-    answer: "Onze e-sports ruimte beschikt over High-End gaming PC's met krachtige RTX 40-series videokaarten en snelle processoren, gekoppeld aan 240Hz monitoren voor competitieve gameplay.",
+    answer: "Onze e-sports ruimte beschikt over High-End gaming PC's met krachtige RTX 50-series videokaarten en snelle processoren, gekoppeld aan 180Hz monitoren voor competitieve gameplay.",
   },
   {
     question: "Welke games mag ik spelen?",
