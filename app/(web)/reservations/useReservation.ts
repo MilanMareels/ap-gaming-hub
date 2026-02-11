@@ -1,8 +1,8 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { doc, onSnapshot } from "firebase/firestore";
-import { db } from "../lib/firebase";
-import { DaySchedule, Reservation } from "../lib/types";
-import { createReservation } from "../actions/createReservation";
+import { db } from "../../lib/firebase";
+import { DaySchedule, Reservation } from "../../lib/types";
+import { createReservation } from "../../actions/createReservation";
 
 // Helpers
 const timeToMins = (t: string) => {

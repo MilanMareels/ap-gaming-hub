@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
 import { onAuthStateChanged, User } from "firebase/auth";
 import { doc, onSnapshot } from "firebase/firestore";
-import { auth, db } from "../lib/firebase";
-import { EventItem, Reservation, Highscore, RosterData, DaySchedule } from "../lib/types";
+import { auth, db } from "../../lib/firebase";
+import { EventItem, Reservation, Highscore, RosterData, DaySchedule } from "../../lib/types";
 import {
   addEventAction,
   deleteEventAction,
@@ -16,7 +16,7 @@ import {
   updateSettingsAction,
   updateInventoryAction,
   saveTimetableAction,
-} from "../actions/adminActions";
+} from "../../actions/adminActions";
 
 const DEFAULT_WEEK = [
   { day: "Maandag", slots: [] },
