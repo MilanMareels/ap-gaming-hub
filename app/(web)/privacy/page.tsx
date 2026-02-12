@@ -1,7 +1,6 @@
 "use client";
 
-import React from "react";
-import { ScrollReveal } from "../components/ScrollReveal";
+import { ScrollReveal } from "../../components/ScrollReveal";
 import { Shield, Lock, Eye, FileText, Mail } from "lucide-react";
 
 export default function PrivacyPage() {
