@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { signInWithEmailAndPassword, User } from "firebase/auth";
 import { Loader2 } from "lucide-react";
-import { auth } from "../lib/firebase";
+import { auth } from "../../lib/firebase";
 
 export const LoginScreen = ({ onLoginSuccess }: { onLoginSuccess: (u: User) => void }) => {
   const [email, setEmail] = useState("");
