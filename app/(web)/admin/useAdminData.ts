@@ -75,7 +75,11 @@ export function useAdminData() {
     const unsubRes = onSnapshot(doc(db, "content", "reservations"), (d) => {
       if (d.exists()) {
         const list = d.data().reservations || [];
-        list.sort((a: any, b: any) => b.date.localeCompare(a.date));
+        list.sort((a: any, b: any) => {
+          const dateCompare = a.date.localeCompare(b.date);
+          if (dateCompare !== 0) return dateCompare;
+          return a.startTime.localeCompare(b.startTime);
+        });
         setReservations(list);
       }
     });
