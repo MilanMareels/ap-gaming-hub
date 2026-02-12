@@ -52,25 +52,32 @@ export default function RosterPage() {
           ))}
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 max-w-6xl mx-auto">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[repeat(auto-fit,16rem)] justify-center gap-6 max-w-380 mx-auto">
           {(rosters[activeGame] || []).length === 0 ? (
             <div className="col-span-full text-center text-gray-500 italic">Geen spelers in dit team.</div>
           ) : (
             (rosters[activeGame] || []).map((player: any, idx: number) => (
               <ScrollReveal key={idx} direction="up" delay={idx * 50}>
-                <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 hover:border-red-500/50 hover:-translate-y-2 transition-all group text-center">
-                  <div className="w-20 h-20 bg-slate-800 rounded-full mx-auto mb-4 flex items-center justify-center group-hover:bg-red-600/20 group-hover:text-red-500 transition-colors">
-                    <User size={32} />
+                <div className="h-full bg-slate-900 border border-slate-800 rounded-2xl p-6 hover:border-red-500/50 hover:-translate-y-2 transition-all group text-center flex flex-col justify-between">
+                  <div>
+                    <div className="w-20 h-20 bg-slate-800 rounded-full mx-auto mb-4 flex items-center justify-center group-hover:bg-red-600/20 group-hover:text-red-500 transition-colors">
+                      <User size={32} />
+                    </div>
+                    <h3 className="text-xl font-black text-white truncate px-2" title={player.handle}>
+                      {player.handle}
+                    </h3>
+                    <p className="text-sm text-gray-500 mb-4 truncate">{player.name}</p>
                   </div>
-                  <h3 className="text-xl font-black text-white">{player.handle}</h3>
-                  <p className="text-sm text-gray-500 mb-4">{player.name}</p>
-                  <div className="flex justify-between text-xs p-2 bg-slate-950 rounded border border-slate-800/50 mb-2">
-                    <span className="text-gray-400">Role</span>
-                    <span className="font-bold">{player.role}</span>
-                  </div>
-                  <div className="flex justify-between text-xs p-2 bg-slate-950 rounded border border-slate-800/50">
-                    <span className="text-gray-400">Rank</span>
-                    <span className="font-bold text-red-500">{player.rank}</span>
+
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-xs p-2 bg-slate-950 rounded border border-slate-800/50">
+                      <span className="text-gray-400">Role</span>
+                      <span className="font-bold truncate max-w-25 text-right">{player.role}</span>
+                    </div>
+                    <div className="flex justify-between text-xs p-2 bg-slate-950 rounded border border-slate-800/50">
+                      <span className="text-gray-400">Rank</span>
+                      <span className="font-bold text-red-500 truncate max-w-25 text-right">{player.rank}</span>
+                    </div>
                   </div>
                 </div>
               </ScrollReveal>
