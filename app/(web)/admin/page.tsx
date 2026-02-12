@@ -1,6 +1,5 @@
 "use client";
 
-import { useState, useEffect } from "react";
 import { signOut } from "firebase/auth";
 import { auth } from "../../lib/firebase";
 import { LogOut, Loader2, Plus, Trash2, Save, Check, Ban, X, Clock, Gamepad2, UserCheck, UserX, AlertOctagon, ShieldCheck, ChevronLeft, ChevronRight } from "lucide-react";
@@ -24,15 +23,18 @@ const LIST_SECTIONS = [
 ] as const;
 
 export default function AdminPage() {
-  const [activeTab, setActiveTab] = useState("timetable");
-  const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 10;
-
   const {
     user,
     setUser,
     loading,
     events,
+    activeTab,
+    setActiveTab,
+    currentPage,
+    setCurrentPage,
+    itemsPerPage,
+    totalPages,
+    currentReservations,
     filteredReservations,
     reservationFilterDate,
     setReservationFilterDate,
@@ -77,26 +79,6 @@ export default function AdminPage() {
     removeListItem,
   } = useAdminData();
 
-  useEffect(() => {
-    const today = new Date().toISOString().split("T")[0];
-    setReservationFilterDate(today);
-  }, [setReservationFilterDate]);
-
-  useEffect(() => {
-    const savedTab = localStorage.getItem("adminActiveTab");
-    if (savedTab) setActiveTab(savedTab);
-  }, []);
-
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [reservationFilterDate, reservationSearchQuery]);
-
-  // Paginatie logica
-  const indexOfLastItem = currentPage * itemsPerPage;
-  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentItems = filteredReservations.slice(indexOfFirstItem, indexOfLastItem);
-  const totalPages = Math.ceil(filteredReservations.length / itemsPerPage);
-
   if (loading)
     return (
       <div className="h-screen bg-slate-950 flex items-center justify-center text-white">
@@ -130,10 +112,7 @@ export default function AdminPage() {
           ].map((t) => (
             <button
               key={t.id}
-              onClick={() => {
-                setActiveTab(t.id);
-                localStorage.setItem("adminActiveTab", t.id);
-              }}
+              onClick={() => setActiveTab(t.id)}
               className={`capitalize px-6 py-2 rounded-lg font-bold whitespace-nowrap transition-colors ${
                 activeTab === t.id ? "bg-red-600 text-white shadow-lg shadow-red-900/20" : "bg-slate-900 text-gray-400 hover:bg-slate-800 hover:text-white"
               }`}
@@ -180,7 +159,7 @@ export default function AdminPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800">
-                  {currentItems.map((r) => (
+                  {currentReservations.map((r) => (
                     <tr key={r.id}>
                       <td className="p-4 font-bold">
                         {r.sNumber}
