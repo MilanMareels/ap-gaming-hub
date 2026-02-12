@@ -7,6 +7,22 @@ import { LogOut, Loader2, Plus, Trash2, Save, Check, Ban, X, Clock, Gamepad2, Us
 import { LoginScreen } from "./LoginScreen";
 import { useAdminData } from "./useAdminData";
 
+//  Lookup object voor inventory labels
+const INVENTORY_LABELS: Record<string, string> = {
+  pc: "Aantal PC's",
+  ps5: "PS5 Consoles",
+  switch: "Nintendo Switch",
+  controller: "PS5 Controllers",
+  "Nintendo Controllers": "Nintendo Controllers",
+};
+
+// Configuratie voor de lijsten
+const LIST_SECTIONS = [
+  { key: "rosterGames", label: "Roster Games", stateKey: "roster" },
+  { key: "highscoreGames", label: "Highscore Games", stateKey: "highscore" },
+  { key: "eventTypes", label: "Event Types", stateKey: "event" },
+] as const;
+
 export default function AdminPage() {
   const [activeTab, setActiveTab] = useState("timetable");
   const [currentPage, setCurrentPage] = useState(1);
@@ -67,6 +83,11 @@ export default function AdminPage() {
   }, [setReservationFilterDate]);
 
   useEffect(() => {
+    const savedTab = localStorage.getItem("adminActiveTab");
+    if (savedTab) setActiveTab(savedTab);
+  }, []);
+
+  useEffect(() => {
     setCurrentPage(1);
   }, [reservationFilterDate, reservationSearchQuery]);
 
@@ -109,7 +130,10 @@ export default function AdminPage() {
           ].map((t) => (
             <button
               key={t.id}
-              onClick={() => setActiveTab(t.id)}
+              onClick={() => {
+                setActiveTab(t.id);
+                localStorage.setItem("adminActiveTab", t.id);
+              }}
               className={`capitalize px-6 py-2 rounded-lg font-bold whitespace-nowrap transition-colors ${
                 activeTab === t.id ? "bg-red-600 text-white shadow-lg shadow-red-900/20" : "bg-slate-900 text-gray-400 hover:bg-slate-800 hover:text-white"
               }`}
@@ -648,19 +672,7 @@ export default function AdminPage() {
                   {Object.entries(inventory).map(([key, count]) => (
                     <div key={key}>
                       <div className="flex justify-between items-center mb-1">
-                        <label className="text-xs font-bold text-gray-500 capitalize">
-                          {key === "pc"
-                            ? "Aantal PC's"
-                            : key === "ps5"
-                              ? "PS5 Consoles"
-                              : key === "switch"
-                                ? "Nintendo Switch"
-                                : key === "controller"
-                                  ? "PS5 Controllers"
-                                  : key === "Nintendo Controllers"
-                                    ? "Nintendo Controllers"
-                                    : key}
-                        </label>
+                        <label className="text-xs font-bold text-gray-500 capitalize">{INVENTORY_LABELS[key] || key}</label>
                         <button onClick={() => handleRemoveInventoryItem(key)} className="text-red-500 hover:text-red-400 transition-colors">
                           <X size={14} />
                         </button>
@@ -700,19 +712,20 @@ export default function AdminPage() {
             </div>
             <div className="bg-slate-900 p-6 rounded-xl border border-slate-800">
               <h3 className="font-bold mb-4">Lijsten Beheren</h3>
-              {[
-                { key: "rosterGames", label: "Roster Games", state: newListItems.roster, set: (v: string) => setNewListItems({ ...newListItems, roster: v }) },
-                { key: "highscoreGames", label: "Highscore Games", state: newListItems.highscore, set: (v: string) => setNewListItems({ ...newListItems, highscore: v }) },
-                { key: "eventTypes", label: "Event Types", state: newListItems.event, set: (v: string) => setNewListItems({ ...newListItems, event: v }) },
-              ].map((l: any) => (
-                <div key={l.key} className="mb-6">
-                  <label className="text-xs font-bold text-gray-500">{l.label}</label>
+              {LIST_SECTIONS.map((section) => (
+                <div key={section.key} className="mb-6">
+                  <label className="text-xs font-bold text-gray-500">{section.label}</label>
                   <div className="flex gap-2 mt-1 mb-2">
-                    <input className="flex-1 bg-slate-950 border border-slate-700 p-2 rounded text-sm" value={l.state} onChange={(e) => l.set(e.target.value)} placeholder="Nieuw item..." />
+                    <input
+                      className="flex-1 bg-slate-950 border border-slate-700 p-2 rounded text-sm"
+                      value={newListItems[section.stateKey]}
+                      onChange={(e) => setNewListItems({ ...newListItems, [section.stateKey]: e.target.value })}
+                      placeholder="Nieuw item..."
+                    />
                     <button
                       onClick={() => {
-                        addListItem(l.key, l.state);
-                        l.set("");
+                        addListItem(section.key, newListItems[section.stateKey]);
+                        setNewListItems({ ...newListItems, [section.stateKey]: "" });
                       }}
                       className="bg-blue-600 px-3 rounded"
                     >
@@ -720,10 +733,10 @@ export default function AdminPage() {
                     </button>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    {(lists as any)[l.key].map((item: string, i: number) => (
+                    {(lists as any)[section.key].map((item: string, i: number) => (
                       <span key={i} className="bg-slate-950 border border-slate-700 px-2 py-1 rounded text-xs flex items-center gap-2">
                         {item}{" "}
-                        <button onClick={() => removeListItem(l.key, i)} className="text-red-500">
+                        <button onClick={() => removeListItem(section.key, i)} className="text-red-500">
                           <X size={12} />
                         </button>
                       </span>
