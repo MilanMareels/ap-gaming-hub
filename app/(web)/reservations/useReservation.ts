@@ -1,7 +1,8 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { doc, setDoc, arrayUnion, onSnapshot, getDoc } from "firebase/firestore";
-import { db } from "../lib/firebase";
-import { DaySchedule, Reservation } from "../lib/types";
+import { doc, onSnapshot } from "firebase/firestore";
+import { db } from "../../lib/firebase";
+import { DaySchedule, Reservation } from "../../lib/types";
+import { createReservation } from "../../actions/createReservation";
 
 // Helpers
 const timeToMins = (t: string) => {
@@ -141,26 +142,16 @@ export function useReservation() {
     setLoading(true);
 
     try {
-      if (!formData.sNumber.toLowerCase().startsWith("s")) throw new Error("Gebruik een geldig s-nummer.");
-      if (!formData.email.endsWith("@ap.be") && !formData.email.endsWith("@student.ap.be")) throw new Error("Gebruik je officiële AP email.");
+      if (!/^s[0-9]+$/.test(formData.sNumber.toLowerCase())) throw new Error("Gebruik een geldig s-nummer (s + cijfers).");
+      if (!formData.email.endsWith("@student.ap.be")) throw new Error("Gebruik je officiële AP email.");
       if (!formData.startTime) throw new Error("Selecteer een starttijd.");
 
       const currentSNumber = formData.sNumber.trim().toLowerCase();
+      // We keep basic client-side overlap checks for fast feedback,
+      // but the server action will do the authoritative check.
       const startMins = timeToMins(formData.startTime);
       const duration = parseInt(formData.duration || "60");
       const endMins = startMins + duration;
-      const endTime = minsToTime(endMins);
-      const controllersCount = formData.inventory === "ps5" || formData.inventory === "switch" ? formData.controllers : formData.extraController ? 1 : 0;
-
-      const logsRef = doc(db, "content", "logs");
-      const logsSnap = await getDoc(logsRef);
-      if (logsSnap.exists()) {
-        const logsData = logsSnap.data();
-        const userStrikes = (logsData.noShows || []).filter((log: any) => log.sNumber && log.sNumber.trim().toLowerCase() === currentSNumber);
-        if (userStrikes.length >= 3) {
-          throw new Error("Je account is geblokkeerd vanwege 3 no-shows. Contacteer een admin.");
-        }
-      }
 
       let totalDuration = 0;
       let hasOverlap = false;
@@ -192,20 +183,11 @@ export function useReservation() {
       if (hasInsufficientGap) throw new Error("Er moet minstens 30 minuten tussen je reservaties zitten.");
       if (totalDuration + duration > 240) throw new Error(`Je mag maximaal 4 uur per dag reserveren. Je hebt al ${totalDuration / 60} uur.`);
 
-      const newReservation = {
-        id: Date.now().toString(),
-        sNumber: formData.sNumber,
-        email: formData.email,
-        inventory: formData.inventory,
-        date: formData.date,
-        startTime: formData.startTime,
-        endTime: endTime,
-        controllers: controllersCount,
-        status: "booked",
-        createdAt: new Date().toISOString(),
-      };
+      // Call Server Action
+      const result = await createReservation(formData);
 
-      await setDoc(doc(db, "content", "reservations"), { reservations: arrayUnion(newReservation) }, { merge: true });
+      if (!result.success) throw new Error(result.error);
+
       setSuccess(true);
     } catch (err: any) {
       setError(err.message);
