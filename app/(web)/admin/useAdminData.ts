@@ -47,6 +47,11 @@ export function useAdminData() {
   const [reservationSearchQuery, setReservationSearchQuery] = useState("");
   const [noShowSearchQuery, setNoShowSearchQuery] = useState("");
 
+  // UI State (Verplaatst vanuit page.tsx)
+  const [activeTab, setActiveTabState] = useState("timetable");
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+
   const [newEvent, setNewEvent] = useState({ title: "", date: "", time: "", endTime: "", type: "Casual" });
   const [newPlayer, setNewPlayer] = useState({ name: "", handle: "", role: "", rank: "" });
   const [rosterGame, setRosterGame] = useState("");
@@ -75,7 +80,11 @@ export function useAdminData() {
     const unsubRes = onSnapshot(doc(db, "content", "reservations"), (d) => {
       if (d.exists()) {
         const list = d.data().reservations || [];
-        list.sort((a: any, b: any) => b.date.localeCompare(a.date));
+        list.sort((a: any, b: any) => {
+          const dateCompare = a.date.localeCompare(b.date);
+          if (dateCompare !== 0) return dateCompare;
+          return a.startTime.localeCompare(b.startTime);
+        });
         setReservations(list);
       }
     });
@@ -125,6 +134,27 @@ export function useAdminData() {
       unsubLogs();
     };
   }, [user]);
+
+  // UI Effects (Verplaatst vanuit page.tsx)
+  useEffect(() => {
+    const today = new Date().toISOString().split("T")[0];
+    setReservationFilterDate(today);
+  }, []);
+
+  useEffect(() => {
+    const savedTab = localStorage.getItem("adminActiveTab");
+    if (savedTab) setActiveTabState(savedTab);
+  }, []);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [reservationFilterDate, reservationSearchQuery]);
+
+  // Wrapper voor setActiveTab om ook localStorage te updaten
+  const setActiveTab = (tab: string) => {
+    setActiveTabState(tab);
+    localStorage.setItem("adminActiveTab", tab);
+  };
 
   // Handlers
   const handleAddEvent = async () => {
@@ -260,6 +290,12 @@ export function useAdminData() {
     return noShowSearchQuery ? (log.sNumber && log.sNumber.toLowerCase().includes(searchLower)) || (log.email && log.email.toLowerCase().includes(searchLower)) : true;
   });
 
+  // Paginatie Logica
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentReservations = filteredReservations.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = Math.ceil(filteredReservations.length / itemsPerPage);
+
   return {
     user,
     setUser,
@@ -267,6 +303,13 @@ export function useAdminData() {
     events,
     reservations,
     filteredReservations,
+    currentReservations, // De gepagineerde lijst
+    activeTab,
+    setActiveTab,
+    currentPage,
+    setCurrentPage,
+    totalPages,
+    itemsPerPage,
     reservationFilterDate,
     setReservationFilterDate,
     reservationSearchQuery,
