@@ -1,20 +1,40 @@
 "use client";
 
-import { useState } from "react";
 import { signOut } from "firebase/auth";
 import { auth } from "../../lib/firebase";
-import { LogOut, Loader2, Plus, Trash2, Save, Check, Ban, X, Clock, Gamepad2, UserCheck, UserX, AlertOctagon, ShieldCheck } from "lucide-react";
+import { LogOut, Loader2, Plus, Trash2, Save, Check, Ban, X, Clock, Gamepad2, UserCheck, UserX, AlertOctagon, ShieldCheck, ChevronLeft, ChevronRight } from "lucide-react";
 import { LoginScreen } from "./LoginScreen";
 import { useAdminData } from "./useAdminData";
 
-export default function AdminPage() {
-  const [activeTab, setActiveTab] = useState("timetable");
+//  Lookup object voor inventory labels
+const INVENTORY_LABELS: Record<string, string> = {
+  pc: "Aantal PC's",
+  ps5: "PS5 Consoles",
+  switch: "Nintendo Switch",
+  controller: "PS5 Controllers",
+  "Nintendo Controllers": "Nintendo Controllers",
+};
 
+// Configuratie voor de lijsten
+const LIST_SECTIONS = [
+  { key: "rosterGames", label: "Roster Games", stateKey: "roster" },
+  { key: "highscoreGames", label: "Highscore Games", stateKey: "highscore" },
+  { key: "eventTypes", label: "Event Types", stateKey: "event" },
+] as const;
+
+export default function AdminPage() {
   const {
     user,
     setUser,
     loading,
     events,
+    activeTab,
+    setActiveTab,
+    currentPage,
+    setCurrentPage,
+    itemsPerPage,
+    totalPages,
+    currentReservations,
     filteredReservations,
     reservationFilterDate,
     setReservationFilterDate,
@@ -104,107 +124,132 @@ export default function AdminPage() {
 
         {/* RESERVATIONS */}
         {activeTab === "reservations" && (
-          <div className="bg-slate-900 rounded-xl border border-slate-800 overflow-hidden">
-            <div className="p-4 border-b border-slate-800 flex items-center gap-4 bg-slate-950">
-              <span className="text-sm font-bold text-gray-500 uppercase">Filter op datum:</span>
-              <input
-                type="date"
-                className="bg-slate-900 border border-slate-700 rounded p-2 text-white text-sm [&::-webkit-calendar-picker-indicator]:invert"
-                value={reservationFilterDate}
-                onChange={(e) => setReservationFilterDate(e.target.value)}
-              />
-              <input
-                type="text"
-                placeholder="Zoek op Email of S nummer"
-                className="bg-slate-900 border border-slate-700 rounded p-2 text-white text-sm w-64"
-                value={reservationSearchQuery}
-                onChange={(e) => setReservationSearchQuery(e.target.value)}
-              />
-              {reservationFilterDate && (
-                <button onClick={() => setReservationFilterDate("")} className="text-xs text-red-500 hover:underline">
-                  Reset Filter
-                </button>
-              )}
-            </div>
-            <table className="w-full text-left text-sm">
-              <thead className="bg-slate-950 text-gray-500 uppercase">
-                <tr>
-                  <th className="p-4">Student</th>
-                  <th className="p-4">Datum</th>
-                  <th className="p-4">Tijd</th>
-                  <th className="p-4">Hardware & Info</th>
-                  <th className="p-4">Status</th>
-                  <th className="p-4 text-right">Actie</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800">
-                {filteredReservations.map((r) => (
-                  <tr key={r.id}>
-                    <td className="p-4 font-bold">
-                      {r.sNumber}
-                      <div className="text-xs text-gray-500 font-normal">{r.email}</div>
-                    </td>
-                    <td className="p-4">{r.date}</td>
-                    <td className="p-4">
-                      {r.startTime} - {r.endTime}
-                    </td>
-                    <td className="p-4">
-                      <div className="flex flex-col gap-1 items-start">
-                        <span
-                          className={`px-2 py-1 rounded text-xs font-bold uppercase ${["pc", "switch"].includes(r.inventory.toLowerCase()) ? "bg-red-900/30 text-red-400" : "bg-blue-900/30 text-blue-400"}`}
-                        >
-                          {r.inventory}
-                        </span>
-                        {((r.controllers || 0) > 0 || r.inventory.toLowerCase() === "pc") && (
-                          <span className="text-xs text-gray-400 flex items-center gap-1">
-                            <Gamepad2 size={12} />
-                            {r.inventory.toLowerCase() === "pc" ? `1 Speler${(r.controllers || 0) > 0 ? " (+ Controller)" : ""}` : `${r.controllers} ${r.controllers === 1 ? "Speler" : "Spelers"}`}
+          <>
+            <div className="bg-slate-900 rounded-xl border border-slate-800 overflow-hidden">
+              <div className="p-4 border-b border-slate-800 flex items-center gap-4 bg-slate-950">
+                <span className="text-sm font-bold text-gray-500 uppercase">Filter op datum:</span>
+                <input
+                  type="date"
+                  className="bg-slate-900 border border-slate-700 rounded p-2 text-white text-sm [&::-webkit-calendar-picker-indicator]:invert"
+                  value={reservationFilterDate}
+                  onChange={(e) => setReservationFilterDate(e.target.value)}
+                />
+                <input
+                  type="text"
+                  placeholder="Zoek op Email of S nummer"
+                  className="bg-slate-900 border border-slate-700 rounded p-2 text-white text-sm w-64"
+                  value={reservationSearchQuery}
+                  onChange={(e) => setReservationSearchQuery(e.target.value)}
+                />
+                {reservationFilterDate && (
+                  <button onClick={() => setReservationFilterDate("")} className="text-xs text-red-500 hover:underline">
+                    Reset Filter
+                  </button>
+                )}
+              </div>
+              <table className="w-full text-left text-sm">
+                <thead className="bg-slate-950 text-gray-500 uppercase">
+                  <tr>
+                    <th className="p-4">Student</th>
+                    <th className="p-4">Datum</th>
+                    <th className="p-4">Tijd</th>
+                    <th className="p-4">Hardware & Info</th>
+                    <th className="p-4">Status</th>
+                    <th className="p-4 text-right">Actie</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800">
+                  {currentReservations.map((r) => (
+                    <tr key={r.id}>
+                      <td className="p-4 font-bold">
+                        {r.sNumber}
+                        <div className="text-xs text-gray-500 font-normal">{r.email}</div>
+                      </td>
+                      <td className="p-4">{r.date}</td>
+                      <td className="p-4">
+                        {r.startTime} - {r.endTime}
+                      </td>
+                      <td className="p-4">
+                        <div className="flex flex-col gap-1 items-start">
+                          <span
+                            className={`px-2 py-1 rounded text-xs font-bold uppercase ${["pc", "switch"].includes(r.inventory.toLowerCase()) ? "bg-red-900/30 text-red-400" : "bg-blue-900/30 text-blue-400"}`}
+                          >
+                            {r.inventory}
+                          </span>
+                          {((r.controllers || 0) > 0 || r.inventory.toLowerCase() === "pc") && (
+                            <span className="text-xs text-gray-400 flex items-center gap-1">
+                              <Gamepad2 size={12} />
+                              {r.inventory.toLowerCase() === "pc" ? `1 Speler${(r.controllers || 0) > 0 ? " (+ Controller)" : ""}` : `${r.controllers} ${r.controllers === 1 ? "Speler" : "Spelers"}`}
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="p-4">
+                        {r.status === "present" ? (
+                          <span className="text-green-500 font-bold text-xs uppercase bg-green-900/20 px-2 py-1 rounded flex w-fit items-center gap-1">
+                            <Check size={12} /> Aanwezig
+                          </span>
+                        ) : r.status === "not-present" ? (
+                          <span className="text-red-500 font-bold text-xs uppercase bg-red-900/20 px-2 py-1 rounded flex w-fit items-center gap-1">
+                            <UserX size={12} /> Afwezig
+                          </span>
+                        ) : (
+                          <span className="text-yellow-500 font-bold text-xs uppercase bg-yellow-900/20 px-2 py-1 rounded">
+                            {r.status === "active" ? "Geboekt" : r.status === "booked" ? "Geboekt" : r.status}
                           </span>
                         )}
-                      </div>
-                    </td>
-                    <td className="p-4">
-                      {r.status === "present" ? (
-                        <span className="text-green-500 font-bold text-xs uppercase bg-green-900/20 px-2 py-1 rounded flex w-fit items-center gap-1">
-                          <Check size={12} /> Aanwezig
-                        </span>
-                      ) : r.status === "not-present" ? (
-                        <span className="text-red-500 font-bold text-xs uppercase bg-red-900/20 px-2 py-1 rounded flex w-fit items-center gap-1">
-                          <UserX size={12} /> Afwezig
-                        </span>
-                      ) : (
-                        <span className="text-yellow-500 font-bold text-xs uppercase bg-yellow-900/20 px-2 py-1 rounded">
-                          {r.status === "active" ? "Geboekt" : r.status === "booked" ? "Geboekt" : r.status}
-                        </span>
-                      )}
-                    </td>
-                    <td className="p-4 text-right">
-                      {r.status !== "present" && r.status !== "not-present" && (
-                        <>
-                          <button onClick={() => handleStatusUpdate(r.id, "present")} className="text-green-500 hover:bg-green-900/20 p-2 rounded mr-2" title="Markeer als aanwezig">
-                            <UserCheck size={16} />
-                          </button>
-                          <button onClick={() => handleStatusUpdate(r.id, "not-present")} className="text-orange-500 hover:bg-orange-900/20 p-2 rounded mr-2" title="Markeer als afwezig">
-                            <UserX size={16} />
-                          </button>
-                        </>
-                      )}
-                      <button onClick={() => handleDeleteReservation(r)} className="text-red-500 hover:bg-red-900/20 p-2 rounded">
-                        <Trash2 size={16} />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-                {filteredReservations.length === 0 && (
-                  <tr>
-                    <td colSpan={5} className="p-8 text-center text-gray-500">
-                      Geen reservaties gevonden.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+                      </td>
+                      <td className="p-4 text-right">
+                        {r.status !== "present" && r.status !== "not-present" && (
+                          <>
+                            <button onClick={() => handleStatusUpdate(r.id, "present")} className="text-green-500 hover:bg-green-900/20 p-2 rounded mr-2" title="Markeer als aanwezig">
+                              <UserCheck size={16} />
+                            </button>
+                            <button onClick={() => handleStatusUpdate(r.id, "not-present")} className="text-orange-500 hover:bg-orange-900/20 p-2 rounded mr-2" title="Markeer als afwezig">
+                              <UserX size={16} />
+                            </button>
+                          </>
+                        )}
+                        <button onClick={() => handleDeleteReservation(r)} className="text-red-500 hover:bg-red-900/20 p-2 rounded">
+                          <Trash2 size={16} />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                  {filteredReservations.length === 0 && (
+                    <tr>
+                      <td colSpan={5} className="p-8 text-center text-gray-500">
+                        Geen reservaties gevonden.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Pagination Controls */}
+            {filteredReservations.length > itemsPerPage && (
+              <div className="flex justify-center items-center gap-4 mt-4">
+                <button
+                  onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                  disabled={currentPage === 1}
+                  className="p-2 bg-slate-900 rounded-lg border border-slate-800 hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <ChevronLeft size={20} />
+                </button>
+                <span className="text-sm text-gray-400">
+                  Pagina <span className="text-white font-bold">{currentPage}</span> van <span className="text-white font-bold">{totalPages}</span>
+                </span>
+                <button
+                  onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+                  disabled={currentPage === totalPages}
+                  className="p-2 bg-slate-900 rounded-lg border border-slate-800 hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <ChevronRight size={20} />
+                </button>
+              </div>
+            )}
+          </>
         )}
 
         {/* EVENTS */}
@@ -606,19 +651,7 @@ export default function AdminPage() {
                   {Object.entries(inventory).map(([key, count]) => (
                     <div key={key}>
                       <div className="flex justify-between items-center mb-1">
-                        <label className="text-xs font-bold text-gray-500 capitalize">
-                          {key === "pc"
-                            ? "Aantal PC's"
-                            : key === "ps5"
-                              ? "PS5 Consoles"
-                              : key === "switch"
-                                ? "Nintendo Switch"
-                                : key === "controller"
-                                  ? "PS5 Controllers"
-                                  : key === "Nintendo Controllers"
-                                    ? "Nintendo Controllers"
-                                    : key}
-                        </label>
+                        <label className="text-xs font-bold text-gray-500 capitalize">{INVENTORY_LABELS[key] || key}</label>
                         <button onClick={() => handleRemoveInventoryItem(key)} className="text-red-500 hover:text-red-400 transition-colors">
                           <X size={14} />
                         </button>
@@ -658,19 +691,20 @@ export default function AdminPage() {
             </div>
             <div className="bg-slate-900 p-6 rounded-xl border border-slate-800">
               <h3 className="font-bold mb-4">Lijsten Beheren</h3>
-              {[
-                { key: "rosterGames", label: "Roster Games", state: newListItems.roster, set: (v: string) => setNewListItems({ ...newListItems, roster: v }) },
-                { key: "highscoreGames", label: "Highscore Games", state: newListItems.highscore, set: (v: string) => setNewListItems({ ...newListItems, highscore: v }) },
-                { key: "eventTypes", label: "Event Types", state: newListItems.event, set: (v: string) => setNewListItems({ ...newListItems, event: v }) },
-              ].map((l: any) => (
-                <div key={l.key} className="mb-6">
-                  <label className="text-xs font-bold text-gray-500">{l.label}</label>
+              {LIST_SECTIONS.map((section) => (
+                <div key={section.key} className="mb-6">
+                  <label className="text-xs font-bold text-gray-500">{section.label}</label>
                   <div className="flex gap-2 mt-1 mb-2">
-                    <input className="flex-1 bg-slate-950 border border-slate-700 p-2 rounded text-sm" value={l.state} onChange={(e) => l.set(e.target.value)} placeholder="Nieuw item..." />
+                    <input
+                      className="flex-1 bg-slate-950 border border-slate-700 p-2 rounded text-sm"
+                      value={newListItems[section.stateKey]}
+                      onChange={(e) => setNewListItems({ ...newListItems, [section.stateKey]: e.target.value })}
+                      placeholder="Nieuw item..."
+                    />
                     <button
                       onClick={() => {
-                        addListItem(l.key, l.state);
-                        l.set("");
+                        addListItem(section.key, newListItems[section.stateKey]);
+                        setNewListItems({ ...newListItems, [section.stateKey]: "" });
                       }}
                       className="bg-blue-600 px-3 rounded"
                     >
@@ -678,10 +712,10 @@ export default function AdminPage() {
                     </button>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    {(lists as any)[l.key].map((item: string, i: number) => (
+                    {(lists as any)[section.key].map((item: string, i: number) => (
                       <span key={i} className="bg-slate-950 border border-slate-700 px-2 py-1 rounded text-xs flex items-center gap-2">
                         {item}{" "}
-                        <button onClick={() => removeListItem(l.key, i)} className="text-red-500">
+                        <button onClick={() => removeListItem(section.key, i)} className="text-red-500">
                           <X size={12} />
                         </button>
                       </span>
